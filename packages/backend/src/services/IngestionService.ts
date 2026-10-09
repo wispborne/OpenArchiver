@@ -48,6 +48,7 @@ import {
 	archivedEmails,
 	attachments as attachmentsSchema,
 	emailAttachments,
+	mailboxAliases,
 } from '../database/schema';
 import { createHash, randomUUID } from 'crypto';
 import { readFile, unlink } from 'fs/promises';
@@ -62,6 +63,7 @@ import { normalizeEmailAddress } from '../helpers/emailAddress';
 import { mapWithConcurrency } from '../helpers/mapWithConcurrency';
 import { truncateToBytes } from '../helpers/truncateToBytes';
 import { quoteMeiliString } from '../helpers/meiliFilter';
+import { MailboxAliasCache } from '../helpers/mailboxAlias';
 import { isIndexingWorkerAlive } from '../jobs/helpers/workerLiveness';
 import { buildReindexWhere } from '../jobs/helpers/indexBacklog';
 
@@ -91,11 +93,22 @@ const normalizedMailbox = sql<string>`lower(btrim(${archivedEmails.userEmail}))`
  * changes the casing of a mailbox between syncs misses every dedup check and archives the whole
  * mailbox a second time.
  */
-// Exported for the provider-id backfill job, which must scope rows to a mailbox with exactly
-// the same normalization the dedup checks here use — two spellings of this predicate would
-// only have to disagree once.
+// Exported for the mailbox merge, which must scope rows to a mailbox with exactly the same
+// normalization the dedup checks here use — two spellings of this predicate would only have to
+// disagree once.
 export const matchesMailbox = (normalizedAddress: string) =>
 	eq(normalizedMailbox, normalizedAddress);
+
+/**
+ * Matches the rows that were fetched from one provider mailbox, wherever they are archived now.
+ *
+ * Differs from {@link matchesMailbox} only for mailboxes merged into another: their rows sit under
+ * the mailbox they were merged into and remember the provider's address in `original_user_email`
+ * (stored normalized). Anything that talks to the provider about a row it holds — translating its
+ * provider id, say — must select by this, or it would ask one mailbox about another's messages.
+ */
+export const fetchedFromMailbox = (normalizedAddress: string) =>
+	sql`coalesce(${archivedEmails.originalUserEmail}, ${normalizedMailbox}) = ${normalizedAddress}`;
 
 export class IngestionService {
 	private static auditService = new AuditService();
@@ -112,6 +125,9 @@ export class IngestionService {
 	private effectiveSourceCache = new Map<string, Promise<IngestionSource>>();
 	private attachmentIdCache = new Map<string, Promise<string>>();
 	private static readonly ATTACHMENT_CACHE_MAX = 5_000;
+	// The one memo here that is NOT invariant for the job: a mailbox merge can be performed while a
+	// sync is running, so entries expire (see MAILBOX_ALIAS_CACHE_MS) instead of living for the job.
+	private mailboxAliasCache = new MailboxAliasCache();
 
 	/**
 	 * The Message-ID header as a string, or undefined when the email carries none usable.
@@ -826,6 +842,7 @@ export class IngestionService {
 			mailboxBytesRows,
 			children,
 			recentActivity,
+			mailboxAliasRows,
 		] = await Promise.all([
 			// Email aggregates in a single scan.
 			db
@@ -926,6 +943,17 @@ export class IngestionService {
 				.where(and(emailFilter, gte(archivedEmails.archivedAt, thirtyDaysAgo)))
 				.groupBy(sql`date_trunc('day', ${archivedEmails.archivedAt})`)
 				.orderBy(sql`date_trunc('day', ${archivedEmails.archivedAt})`),
+			// Mailboxes merged into another mailbox of the group. Recorded on the root.
+			db
+				.select({
+					aliasEmail: mailboxAliases.aliasEmail,
+					canonicalEmail: mailboxAliases.canonicalEmail,
+					createdAt: mailboxAliases.createdAt,
+					createdBy: mailboxAliases.createdBy,
+				})
+				.from(mailboxAliases)
+				.where(eq(mailboxAliases.ingestionSourceId, rootId))
+				.orderBy(mailboxAliases.createdAt),
 		]);
 
 		const emailAgg = emailAggRows[0];
@@ -966,6 +994,7 @@ export class IngestionService {
 			lastSyncFinishedAt: source.lastSyncFinishedAt ?? null,
 			lastSyncStatusMessage: source.lastSyncStatusMessage ?? null,
 			mailboxes,
+			mailboxAliases: mailboxAliasRows,
 			children,
 			recentActivity,
 		};
@@ -1449,6 +1478,20 @@ export class IngestionService {
 	}
 
 	/**
+	 * The mailbox a provider mailbox is archived under: the mailbox it was merged into, if any.
+	 *
+	 * Public so the mailbox processor's duplicate pre-check asks the same memo processEmail does —
+	 * a pre-check that looked under the provider's address would miss every email already moved by
+	 * the merge and download the whole merged mailbox again on each sync.
+	 *
+	 * @param rootSourceId The merge group's root, which is where aliases are recorded.
+	 * @param normalizedEmail An address already passed through normalizeEmailAddress.
+	 */
+	public resolveMailbox(rootSourceId: string, normalizedEmail: string): Promise<string> {
+		return this.mailboxAliasCache.resolve(rootSourceId, normalizedEmail);
+	}
+
+	/**
 	 * The root source that owns storage and DB rows for a merge child, resolved once per job.
 	 *
 	 * findById decrypts the source's credentials every call, so doing this per email spent real CPU
@@ -1572,7 +1615,10 @@ export class IngestionService {
 	): Promise<PendingEmail | ProcessEmailError | null> {
 		// Normalized once here so the dedup gates and all three inserts below agree on what
 		// counts as the same mailbox, whatever casing or padding the provider sent.
-		const userEmail = normalizeEmailAddress(rawUserEmail);
+		const providerMailbox = normalizeEmailAddress(rawUserEmail);
+		// Reassigned below once the merge group is known; until then the provider's address is the
+		// best label the catch block's log has.
+		let userEmail = providerMailbox;
 		try {
 			// Read the raw bytes from the temp file written by the connector
 			const rawEmlBuffer = await readFile(email.tempFilePath);
@@ -1583,6 +1629,14 @@ export class IngestionService {
 			const effectiveSource = source.mergedIntoId
 				? await this.resolveEffectiveSource(source.mergedIntoId)
 				: source;
+
+			// A provider mailbox that was merged into another mailbox of the group is archived
+			// under that mailbox, and everything below — the dedup gates included — must see the
+			// mailbox the row will be written to, or a re-sync of the merged mailbox would archive
+			// all of it again. The provider's address is kept on the row so the merge stays
+			// visible and can be undone.
+			userEmail = await this.resolveMailbox(effectiveSource.id, providerMailbox);
+			const originalUserEmail = userEmail === providerMailbox ? null : providerMailbox;
 
 			// Generate a unique message ID for the email. If the email already has a message-id header, use that.
 			// Otherwise, generate a new one based on the email's hash, source ID, and email ID.
@@ -1656,6 +1710,7 @@ export class IngestionService {
 					.values({
 						ingestionSourceId: effectiveSource.id,
 						userEmail,
+						originalUserEmail,
 						threadId: email.threadId,
 						messageIdHeader: messageId,
 						providerMessageId,
@@ -1800,6 +1855,7 @@ export class IngestionService {
 					.values({
 						ingestionSourceId: effectiveSource.id,
 						userEmail,
+						originalUserEmail,
 						threadId: email.threadId,
 						messageIdHeader: messageId,
 						providerMessageId,
@@ -1847,6 +1903,7 @@ export class IngestionService {
 				.values({
 					ingestionSourceId: effectiveSource.id,
 					userEmail,
+					originalUserEmail,
 					threadId: email.threadId,
 					messageIdHeader: messageId,
 					providerMessageId,

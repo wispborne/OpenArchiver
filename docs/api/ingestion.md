@@ -74,6 +74,28 @@ Compares the number of archived emails in the database against the number of doc
 
 <OAOperation operationId="getIngestionSourceIndexHealth" />
 
+## Preview a Mailbox Merge
+
+Reports what merging one mailbox of the source's merge group into another would do, without changing anything. `blockedReason` is null when the merge can run; otherwise it is one of `same_mailbox`, `circular`, `already_merged`, `sync_running` or `merge_running`. See [Merging Mailboxes](../user-guides/email-providers/merging-mailboxes.md).
+
+<OAOperation operationId="previewMailboxMerge" />
+
+## Merge Mailboxes
+
+Records `from` as an alias of `into` and queues a job on the indexing queue that moves the archived emails. Returns `202`. Re-sending a merge whose alias is already in place finishes a merge whose job failed partway.
+
+<OAOperation operationId="mergeMailboxes" />
+
+## Unmerge a Mailbox
+
+Removes the alias and queues a job that moves the emails that came from the mailbox back out. Returns `202`.
+
+<OAOperation operationId="unmergeMailbox" />
+
+## List Merged Mailboxes
+
+<OAOperation operationId="listMailboxAliases" />
+
 ## Get Statistics
 
 Read-only statistics for a source (and its merge group): email/mailbox/thread counts, storage usage (email + attachment bytes, deduplicated), index coverage, attachment and compliance counts, a per-mailbox breakdown, merge-group children, and recent activity.

@@ -18,7 +18,14 @@
 		Archive,
 		Lock,
 		Database,
+		Merge,
 	} from 'lucide-svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import MailboxMergeDialog from '$lib/components/custom/MailboxMergeDialog.svelte';
+	import { setAlert } from '$lib/components/custom/alert/alert-state.svelte';
+	import { api } from '$lib/api.client';
+	import { invalidateAll } from '$app/navigation';
+	import type { MailboxAlias, MailboxMergeDispatch } from '@open-archiver/types';
 	import { t } from '$lib/translations';
 
 	let { data }: { data: PageData } = $props();
@@ -36,6 +43,65 @@
 	let activityData = $derived(
 		stats.recentActivity.map((a) => ({ date: new Date(a.date), count: a.count }))
 	);
+
+	// Mailboxes merged into each mailbox, shown under its address in the breakdown.
+	let aliasesByMailbox = $derived(
+		stats.mailboxAliases.reduce((acc, alias) => {
+			(acc[alias.canonicalEmail] ??= []).push(alias.aliasEmail);
+			return acc;
+		}, {} as Record<string, string[]>)
+	);
+
+	let isMergeDialogOpen = $state(false);
+	let mergeFrom = $state('');
+	const openMergeDialog = (mailbox: string) => {
+		mergeFrom = mailbox;
+		isMergeDialogOpen = true;
+	};
+
+	let aliasToUnmerge = $state<MailboxAlias | null>(null);
+	let isUnmergeDialogOpen = $state(false);
+	let isUnmerging = $state(false);
+	const openUnmergeDialog = (alias: MailboxAlias) => {
+		aliasToUnmerge = alias;
+		isUnmergeDialogOpen = true;
+	};
+
+	const confirmUnmerge = async () => {
+		if (!aliasToUnmerge) return;
+		isUnmerging = true;
+		try {
+			const res = await api(`/ingestion-sources/${stats.sourceId}/mailboxes/unmerge`, {
+				method: 'POST',
+				body: JSON.stringify({ mailbox: aliasToUnmerge.aliasEmail }),
+			});
+			const body = await res.json();
+			if (!res.ok) {
+				throw new Error(body.message || $t('app.mailbox_merge.unmerge_failed'));
+			}
+			const dispatch = body as MailboxMergeDispatch;
+			setAlert({
+				type: dispatch.workerAlive ? 'success' : 'warning',
+				title: $t('app.mailbox_merge.unmerge_started'),
+				message: dispatch.workerAlive ? '' : $t('app.mailbox_merge.no_worker'),
+				duration: 5000,
+				show: true,
+			});
+			isUnmergeDialogOpen = false;
+			aliasToUnmerge = null;
+			await invalidateAll();
+		} catch (e) {
+			setAlert({
+				type: 'error',
+				title: $t('app.mailbox_merge.unmerge_failed'),
+				message: e instanceof Error ? e.message : String(e),
+				duration: 5000,
+				show: true,
+			});
+		} finally {
+			isUnmerging = false;
+		}
+	};
 </script>
 
 <svelte:head>
@@ -218,19 +284,63 @@
 									<Table.Head>{$t('app.ingestions.mailbox')}</Table.Head>
 									<Table.Head class="text-right">{$t('app.ingestions.total_emails')}</Table.Head>
 									<Table.Head class="text-right">{$t('app.ingestions.storage_used')}</Table.Head>
+									<Table.Head class="w-0"><span class="sr-only">{$t('app.mailbox_merge.actions')}</span></Table.Head>
 								</Table.Row>
 							</Table.Header>
 							<Table.Body>
 								{#each stats.mailboxes as mailbox (mailbox.userEmail)}
 									<Table.Row>
-										<Table.Cell class="font-mono text-sm">{mailbox.userEmail}</Table.Cell>
+										<Table.Cell class="font-mono text-sm">
+											{mailbox.userEmail}
+											{#if aliasesByMailbox[mailbox.userEmail]}
+												<p class="text-muted-foreground font-sans text-xs">
+													{$t('app.mailbox_merge.merged_from', {
+														mailboxes: aliasesByMailbox[mailbox.userEmail].join(', '),
+													} as any)}
+												</p>
+											{/if}
+										</Table.Cell>
 										<Table.Cell class="text-right">{mailbox.emailCount.toLocaleString()}</Table.Cell>
 										<Table.Cell class="text-right">{formatBytes(mailbox.bytes)}</Table.Cell>
+										<Table.Cell class="text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												onclick={() => openMergeDialog(mailbox.userEmail)}
+											>
+												<Merge class="mr-1 h-4 w-4" />
+												{$t('app.mailbox_merge.merge_into')}
+											</Button>
+										</Table.Cell>
 									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
 					</div>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		<!-- Merged mailboxes -->
+		{#if stats.mailboxAliases.length > 0}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title>{$t('app.mailbox_merge.merged_mailboxes')}</Card.Title>
+					<p class="text-muted-foreground text-xs">
+						{$t('app.mailbox_merge.merged_mailboxes_note')}
+					</p>
+				</Card.Header>
+				<Card.Content class="space-y-2">
+					{#each stats.mailboxAliases as alias (alias.aliasEmail)}
+						<div class="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+							<span class="font-mono text-sm break-all">
+								{alias.aliasEmail} → {alias.canonicalEmail}
+							</span>
+							<Button variant="outline" size="sm" onclick={() => openUnmergeDialog(alias)}>
+								{$t('app.mailbox_merge.unmerge')}
+							</Button>
+						</div>
+					{/each}
 				</Card.Content>
 			</Card.Root>
 		{/if}
@@ -257,6 +367,39 @@
 			</Card.Root>
 		{/if}
 	</div>
+
+	<MailboxMergeDialog
+		bind:open={isMergeDialogOpen}
+		sourceId={stats.sourceId}
+		from={mergeFrom}
+		mailboxes={stats.mailboxes.map((m) => m.userEmail)}
+		onMerged={() => invalidateAll()}
+	/>
+
+	<Dialog.Root bind:open={isUnmergeDialogOpen}>
+		<Dialog.Content class="sm:max-w-lg">
+			<Dialog.Header>
+				<Dialog.Title>{$t('app.mailbox_merge.unmerge_title')}</Dialog.Title>
+				<Dialog.Description>
+					{$t('app.mailbox_merge.unmerge_description', {
+						mailbox: aliasToUnmerge?.aliasEmail ?? '',
+						into: aliasToUnmerge?.canonicalEmail ?? '',
+					} as any)}
+				</Dialog.Description>
+			</Dialog.Header>
+			<ul class="text-muted-foreground my-2 ml-4 list-disc space-y-1 text-sm">
+				<li>{$t('app.mailbox_merge.unmerge_warning_duplicates')}</li>
+			</ul>
+			<Dialog.Footer class="sm:justify-start">
+				<Button type="button" onclick={confirmUnmerge} disabled={isUnmerging}>
+					{isUnmerging ? $t('app.mailbox_merge.unmerging') : $t('app.mailbox_merge.unmerge')}
+				</Button>
+				<Dialog.Close>
+					<Button type="button" variant="secondary">{$t('app.ingestions.cancel')}</Button>
+				</Dialog.Close>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
 {:else}
 	<p class="text-muted-foreground">{$t('app.ingestions.stats_not_found')}</p>
 {/if}

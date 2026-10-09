@@ -12,3 +12,4 @@ export * from './schema/enums';
 export * from './schema/sync-sessions';
 export * from './schema/journaling-sources';
 export * from './schema/sso-connections';
+export * from './schema/mailbox-aliases';

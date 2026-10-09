@@ -11,7 +11,28 @@ import { logger } from '../../config/logger';
 import { UserService } from '../../services/UserService';
 import { AuditService } from '../../services/AuditService';
 import { checkDeletionEnabled } from '../../helpers/deletionGuard';
-import type { ReindexMode } from '@open-archiver/types';
+import type { MailboxMergeDispatch, MergeMailboxesDto, ReindexMode } from '@open-archiver/types';
+import { MailboxMergeError, MailboxMergeService } from '../../services/MailboxMergeService';
+import { AuthorizationService } from '../../services/AuthorizationService';
+
+/**
+ * Loose on purpose. A mailbox is whatever identity the connector archived it under — usually an
+ * address, but an IMAP login name or a PST folder name is not always one — so only the shape every
+ * such identity has is checked: one token, of a length an address could have.
+ */
+const looksLikeMailbox = (value: unknown): value is string =>
+	typeof value === 'string' && /^\S{1,320}$/.test(value.trim());
+
+/** HTTP status for each reason a mailbox merge or unmerge can be refused. */
+const MAILBOX_MERGE_ERROR_STATUS: Record<MailboxMergeError['reason'], number> = {
+	same_mailbox: 400,
+	circular: 400,
+	already_merged: 409,
+	sync_running: 409,
+	merge_running: 409,
+	not_merged: 404,
+	deletion_disabled: 403,
+};
 
 export class IngestionController {
 	/**
@@ -437,6 +458,125 @@ export class IngestionController {
 			return res.status(500).json({ message: req.t('errors.internalServerError') });
 		}
 	};
+
+	/** What merging `from` into `into` would do, and whether it may run now. */
+	public previewMailboxMerge = async (req: Request, res: Response): Promise<Response> => {
+		const { from, into } = req.query;
+		if (!looksLikeMailbox(from) || !looksLikeMailbox(into)) {
+			return res.status(400).json({ message: req.t('mailboxMerge.invalidAddress') });
+		}
+		try {
+			const preview = await MailboxMergeService.preview(req.params.id, from, into);
+			return res.status(200).json(preview);
+		} catch (error) {
+			return this.mailboxMergeErrorResponse(req, res, error, 'Preview mailbox merge error');
+		}
+	};
+
+	public mergeMailboxes = async (req: Request, res: Response): Promise<Response> => {
+		const { from, into, collapseDuplicates } = (req.body ?? {}) as MergeMailboxesDto;
+		if (!looksLikeMailbox(from) || !looksLikeMailbox(into)) {
+			return res.status(400).json({ message: req.t('mailboxMerge.invalidAddress') });
+		}
+		try {
+			const userId = req.user?.sub;
+			if (!userId) {
+				return res.status(401).json({ message: req.t('errors.unauthorized') });
+			}
+			const actor = await this.userService.findById(userId);
+			if (!actor) {
+				return res.status(401).json({ message: req.t('errors.unauthorized') });
+			}
+			// The route only demands `update`. Removing the duplicate copies deletes archived
+			// emails, so it needs what the duplicate cleanup itself needs.
+			if (collapseDuplicates) {
+				const source = await IngestionService.findRowById(req.params.id);
+				const canDelete = await new AuthorizationService().can(
+					userId,
+					'delete',
+					'ingestion',
+					source
+				);
+				if (!canDelete) {
+					return res
+						.status(403)
+						.json({ message: req.t('mailboxMerge.noDeletePermission') });
+				}
+			}
+			const { workerAlive } = await MailboxMergeService.merge(
+				req.params.id,
+				from,
+				into,
+				collapseDuplicates === true,
+				actor,
+				req.ip || 'unknown'
+			);
+			const body: MailboxMergeDispatch = {
+				message: req.t('mailboxMerge.queued'),
+				workerAlive,
+			};
+			return res.status(202).json(body);
+		} catch (error) {
+			return this.mailboxMergeErrorResponse(req, res, error, 'Merge mailboxes error');
+		}
+	};
+
+	public unmergeMailbox = async (req: Request, res: Response): Promise<Response> => {
+		const { mailbox } = (req.body ?? {}) as { mailbox?: unknown };
+		if (!looksLikeMailbox(mailbox)) {
+			return res.status(400).json({ message: req.t('mailboxMerge.invalidAddress') });
+		}
+		try {
+			const userId = req.user?.sub;
+			if (!userId) {
+				return res.status(401).json({ message: req.t('errors.unauthorized') });
+			}
+			const actor = await this.userService.findById(userId);
+			if (!actor) {
+				return res.status(401).json({ message: req.t('errors.unauthorized') });
+			}
+			const { workerAlive } = await MailboxMergeService.unmerge(
+				req.params.id,
+				mailbox,
+				actor,
+				req.ip || 'unknown'
+			);
+			const body: MailboxMergeDispatch = {
+				message: req.t('mailboxMerge.unmergeQueued'),
+				workerAlive,
+			};
+			return res.status(202).json(body);
+		} catch (error) {
+			return this.mailboxMergeErrorResponse(req, res, error, 'Unmerge mailbox error');
+		}
+	};
+
+	public listMailboxAliases = async (req: Request, res: Response): Promise<Response> => {
+		try {
+			const rootId = await MailboxMergeService.resolveRootId(req.params.id);
+			return res.status(200).json(await MailboxMergeService.listAliases(rootId));
+		} catch (error) {
+			return this.mailboxMergeErrorResponse(req, res, error, 'List mailbox aliases error');
+		}
+	};
+
+	private mailboxMergeErrorResponse(
+		req: Request,
+		res: Response,
+		error: unknown,
+		logMessage: string
+	): Response {
+		if (error instanceof MailboxMergeError) {
+			return res
+				.status(MAILBOX_MERGE_ERROR_STATUS[error.reason])
+				.json({ message: req.t(`mailboxMerge.${error.reason}`), reason: error.reason });
+		}
+		if (error instanceof Error && error.message === 'Ingestion source not found') {
+			return res.status(404).json({ message: req.t('ingestion.notFound') });
+		}
+		logger.error({ err: error, id: req.params.id }, logMessage);
+		return res.status(500).json({ message: req.t('errors.internalServerError') });
+	}
 
 	public getStats = async (req: Request, res: Response): Promise<Response> => {
 		try {

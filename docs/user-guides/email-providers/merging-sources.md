@@ -1,5 +1,7 @@
 # Merging Ingestion Sources
 
+> To combine two mailboxes inside a source or merge group rather than whole sources, see [Merging Mailboxes](./merging-mailboxes.md).
+
 Merged ingestion groups let you combine multiple ingestion sources so that their emails appear unified in browsing, search, and thread views. This is useful when you want to pair a historical archive (for example, a PST or Mbox import) with a live connection, or when migrating between providers.
 
 ## Concepts

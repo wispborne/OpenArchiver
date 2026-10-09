@@ -14,6 +14,7 @@ import { indexingQueue, ingestionQueue } from '../queues';
 import { SyncSessionService } from '../../services/SyncSessionService';
 import { isMailboxUnavailableError } from '../../services/ingestion-connectors/MicrosoftConnector';
 import { unlink } from 'fs/promises';
+import { normalizeEmailAddress } from '../../helpers/emailAddress';
 
 /**
  * Handles ingestion of emails for a single user's mailbox.
@@ -133,12 +134,16 @@ export const processMailboxProcessor = async (job: Job<IProcessMailboxJob>) => {
 		// Pre-check for duplicates without fetching full email content.
 		// Scoped to this specific mailbox (userEmail) so that different recipients
 		// of the same email each get their own archived row — only skipping when
-		// THIS mailbox already has the email (re-sync idempotency).
+		// THIS mailbox already has the email (re-sync idempotency). "This mailbox" is the one the
+		// rows are archived under, which differs from the provider's when the provider mailbox was
+		// merged into another; processEmail resolves it through the same memo.
+		const rootSourceId = source.mergedIntoId ?? source.id;
+		const normalizedMailbox = normalizeEmailAddress(userEmail);
 		const checkDuplicate = async (messageId: string, internetMessageId?: string) => {
 			return await IngestionService.doesEmailExist(
 				messageId,
 				ingestionSourceId,
-				userEmail,
+				await ingestionService.resolveMailbox(rootSourceId, normalizedMailbox),
 				groupIds,
 				internetMessageId
 			);

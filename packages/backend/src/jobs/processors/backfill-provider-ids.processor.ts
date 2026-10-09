@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import { and, asc, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../database';
 import { archivedEmails, ingestionSources } from '../../database/schema';
-import { IngestionService, matchesMailbox } from '../../services/IngestionService';
+import { IngestionService, fetchedFromMailbox } from '../../services/IngestionService';
 import { EmailProviderFactory } from '../../services/EmailProviderFactory';
 import { MicrosoftConnector } from '../../services/ingestion-connectors/MicrosoftConnector';
 import { normalizeEmailAddress } from '../../helpers/emailAddress';
@@ -79,7 +79,10 @@ export default async function backfillProviderIdsProcessor(
 				await db.query.archivedEmails.findMany({
 					where: and(
 						sourceFilter,
-						matchesMailbox(userEmail),
+						// By the mailbox the rows were fetched from, not the one they are archived
+						// under: Graph can only translate ids of the mailbox that issued them, and
+						// a merged mailbox's rows live under another address.
+						fetchedFromMailbox(userEmail),
 						isNotNull(archivedEmails.providerMessageId),
 						cursor ? gt(archivedEmails.id, cursor) : undefined
 					),

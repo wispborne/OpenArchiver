@@ -95,17 +95,23 @@ export class ArchiveMaintenanceService {
 	 * the pair the dedup treats as one mailbox and this sweep therefore has to treat as one too.
 	 *
 	 * `rank = 1` is the row that stays. A protected row sorts first, so if the group is ever allowed
-	 * to be touched the protected copy is the one kept; otherwise the earliest is. `isProtected` is
+	 * to be touched the protected copy is the one kept. Next comes a row that was archived from the
+	 * mailbox it sits in, ahead of one a mailbox merge moved there: undoing the merge moves the
+	 * latter back out, and had it been the survivor the mailbox would lose its only copy.
+	 * Otherwise the earliest is kept. `isProtected` is
 	 * the group's verdict rather than the row's — see the column. The survivor's hash rides along on
 	 * every row, so a copy whose content differs from it can be refused without a second query.
 	 *
 	 * Merge groups need nothing extra here: a child source writes its rows under its root's id (the
 	 * `effectiveSource` rule), so they already sit inside one source's partition.
+	 *
+	 * `normalizedMailbox` narrows the sweep to one mailbox of the source. The mailbox is part of the
+	 * partition, so filtering on it drops whole groups and never splits one.
 	 */
-	static #rankedDuplicates(ingestionSourceId?: string) {
+	static #rankedDuplicates(ingestionSourceId?: string, normalizedMailbox?: string) {
 		const mailbox = sql`lower(btrim(${archivedEmails.userEmail}))`;
 		const partition = sql`partition by ${archivedEmails.ingestionSourceId}, ${mailbox}, ${archivedEmails.messageIdHeader}`;
-		const order = sql`order by ${this.#protectedRow} desc, ${archivedEmails.archivedAt} asc, ${archivedEmails.id} asc`;
+		const order = sql`order by ${this.#protectedRow} desc, (${archivedEmails.originalUserEmail} is null) desc, ${archivedEmails.archivedAt} asc, ${archivedEmails.id} asc`;
 
 		return db
 			.select({
@@ -130,12 +136,13 @@ export class ArchiveMaintenanceService {
 			})
 			.from(archivedEmails)
 			.where(
-				ingestionSourceId
-					? and(
-							isNotNull(archivedEmails.messageIdHeader),
-							eq(archivedEmails.ingestionSourceId, ingestionSourceId)
-						)
-					: isNotNull(archivedEmails.messageIdHeader)
+				and(
+					isNotNull(archivedEmails.messageIdHeader),
+					ingestionSourceId
+						? eq(archivedEmails.ingestionSourceId, ingestionSourceId)
+						: undefined,
+					normalizedMailbox ? sql`${mailbox} = ${normalizedMailbox}` : undefined
+				)
 			)
 			.as('ranked');
 	}
@@ -148,9 +155,10 @@ export class ArchiveMaintenanceService {
 	 * content differs from the row being kept is detected during the sweep, not here.
 	 */
 	public static async countDuplicates(
-		ingestionSourceId?: string
+		ingestionSourceId?: string,
+		normalizedMailbox?: string
 	): Promise<IDuplicateCountResponse> {
-		const ranked = this.#rankedDuplicates(ingestionSourceId);
+		const ranked = this.#rankedDuplicates(ingestionSourceId, normalizedMailbox);
 		const [row] = await db
 			.select({
 				duplicates: sql<number>`count(*) filter (where not ${ranked.isProtected})::int`,
@@ -219,7 +227,8 @@ export class ArchiveMaintenanceService {
 	public static async cleanupDuplicates(
 		actor: User,
 		actorIp: string,
-		ingestionSourceId?: string
+		ingestionSourceId?: string,
+		normalizedMailbox?: string
 	): Promise<ICleanupDuplicatesResult> {
 		let examined = 0;
 		let removed = 0;
@@ -229,7 +238,7 @@ export class ArchiveMaintenanceService {
 		let cursor: string | null = null;
 
 		for (;;) {
-			const ranked = this.#rankedDuplicates(ingestionSourceId);
+			const ranked = this.#rankedDuplicates(ingestionSourceId, normalizedMailbox);
 			const page = await db
 				.select({
 					id: ranked.id,

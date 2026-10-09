@@ -322,6 +322,8 @@ export interface IngestionStats {
 	lastSyncStatusMessage: string | null;
 	/** Per-mailbox breakdown, ordered by email count desc. */
 	mailboxes: { userEmail: string; emailCount: number; bytes: number }[];
+	/** Mailboxes merged into another mailbox of this group, oldest merge first. */
+	mailboxAliases: MailboxAlias[];
 	/** Merge-group child sources (empty when this is a standalone source). */
 	children: { id: string; name: string; provider: IngestionProvider; status: IngestionStatus }[];
 	/** Emails archived per day over the last 30 days. */
@@ -383,3 +385,98 @@ export type ProcessEmailError = {
 	error: true;
 	message: string;
 };
+
+/**
+ * A mailbox merged into another mailbox of the same merge group. Mail archived from, or still
+ * synced from, `aliasEmail` is stored under `canonicalEmail`. Both addresses are normalized.
+ */
+export interface MailboxAlias {
+	aliasEmail: string;
+	canonicalEmail: string;
+	createdAt: Date | string;
+	/** The user who performed the merge, or null when that user has since been deleted. */
+	createdBy: string | null;
+}
+
+/** Request body for merging one mailbox of an ingestion source into another. */
+export interface MergeMailboxesDto {
+	/** The mailbox to merge away. */
+	from: string;
+	/** The mailbox to merge into. Need not exist yet, which makes the merge a rename. */
+	into: string;
+	/**
+	 * Also remove copies of a message that both mailboxes held, keeping one per message. Off by
+	 * default; requires deletion to be enabled and `delete:ingestion` permission. Copies under a
+	 * legal hold, a retention label, or journaling are never removed.
+	 */
+	collapseDuplicates?: boolean;
+}
+
+/** What a mailbox merge would do, computed without doing it. */
+export interface MailboxMergePreview {
+	/** The mailbox being merged away, normalized. */
+	from: string;
+	/**
+	 * The mailbox the rows will land in, normalized. Differs from the requested address when that
+	 * address was itself merged into another mailbox: aliases are kept flat, so the merge follows it.
+	 */
+	into: string;
+	/** Whether `into` already holds any archived email. False means the merge is a rename. */
+	intoExists: boolean;
+	/** Archived emails that will move from `from` to `into`. */
+	emailsToMove: number;
+	/** Messages (by Message-ID) both mailboxes hold, which would then appear twice in `into`. */
+	duplicateMessages: number;
+	/** Whether the duplicate copies can be removed in this deployment (deletion enabled). */
+	deletionEnabled: boolean;
+	/**
+	 * Why the merge cannot run right now, or null when it can. A translation-free code so the client
+	 * can word it: `same_mailbox`, `circular`, `already_merged`, `sync_running`, `merge_running`.
+	 */
+	blockedReason: MailboxMergeBlockedReason | null;
+}
+
+export type MailboxMergeBlockedReason =
+	| 'same_mailbox'
+	| 'circular'
+	| 'already_merged'
+	| 'sync_running'
+	| 'merge_running';
+
+/** Response for a queued mailbox merge or unmerge. */
+export interface MailboxMergeDispatch {
+	message: string;
+	/** Whether an indexing worker is alive to run the job. */
+	workerAlive: boolean;
+}
+
+/** Payload for the `merge-mailboxes` job on the indexing queue. */
+export interface IMergeMailboxesJob {
+	/** The merge group's root source; every row of the group is stored under it. */
+	rootSourceId: string;
+	/** Normalized address being merged away. */
+	from: string;
+	/** Normalized address being merged into (already resolved through existing aliases). */
+	into: string;
+	collapseDuplicates: boolean;
+	actorId: string;
+	actorIp: string;
+}
+
+/** Payload for the `unmerge-mailbox` job on the indexing queue. */
+export interface IUnmergeMailboxJob {
+	rootSourceId: string;
+	/** Normalized address whose rows are moved back out of the mailbox they were merged into. */
+	mailbox: string;
+	actorId: string;
+	actorIp: string;
+}
+
+/** What a completed mailbox merge did. Logged by the job and returned as its result. */
+export interface IMergeMailboxesResult {
+	moved: number;
+	/** Duplicate copies removed; zero unless `collapseDuplicates` was set. */
+	duplicatesRemoved: number;
+	/** Duplicate copies left in place: protected, differing content, or a failed delete. */
+	duplicatesKept: number;
+}

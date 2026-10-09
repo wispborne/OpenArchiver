@@ -21,6 +21,11 @@ export const archivedEmails = pgTable(
 			.notNull()
 			.references(() => ingestionSources.id, { onDelete: 'cascade' }),
 		userEmail: text('user_email').notNull(),
+		/** The provider mailbox this row was fetched from, when it differs from `userEmail` because
+		 * that mailbox was merged into another one (see mailbox_aliases). Null for every row that
+		 * still sits in the mailbox it was archived from. Lets a merge be undone and records where
+		 * the message really came from, since the stored .eml is never touched by a merge. */
+		originalUserEmail: text('original_user_email'),
 		messageIdHeader: text('message_id_header'),
 		/** The provider-specific message ID (e.g., Gmail API ID, Graph API ID).
 		 * Used by the pre-fetch duplicate check to avoid unnecessary API calls during retries. */
@@ -58,6 +63,11 @@ export const archivedEmails = pgTable(
 		// storage_hash_sha256 + ingestion_source_id. Without this, every email ingested by
 		// a preserve-original source sequential-scans archived_emails, the same
 		// full-scan-per-email pathology msgid_header_source_idx fixed for the default path.
+		// Rows moved by a mailbox merge, found again by an unmerge. Partial, so it costs nothing
+		// for the overwhelming majority of rows that were never merged.
+		index('original_user_email_source_idx')
+			.on(table.ingestionSourceId, table.originalUserEmail)
+			.where(sql`${table.originalUserEmail} is not null`),
 		index('storage_hash_source_idx').on(table.storageHashSha256, table.ingestionSourceId),
 		// Partial index for the reconcile/reindex scan. Keyed on id (the keyset
 		// pagination order) and filtered to unindexed rows, so once the archive is

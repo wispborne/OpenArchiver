@@ -12,6 +12,7 @@ Choose your provider from the list below to get started:
 - [PST Import](./pst.md)
 - [Mbox Import](./mbox.md)
 - [Merging Ingestion Sources](./merging-sources.md)
+- [Merging Mailboxes](./merging-mailboxes.md)
 
 ## What gets archived
 

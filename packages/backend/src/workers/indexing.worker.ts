@@ -5,6 +5,8 @@ import reindexProcessor from '../jobs/processors/reindex.processor';
 import reconcileIndexProcessor from '../jobs/processors/reconcile-index.processor';
 import cleanupOrphansProcessor from '../jobs/processors/cleanup-orphans.processor';
 import cleanupDuplicatesProcessor from '../jobs/processors/cleanup-duplicates.processor';
+import mergeMailboxesProcessor from '../jobs/processors/merge-mailboxes.processor';
+import unmergeMailboxProcessor from '../jobs/processors/unmerge-mailbox.processor';
 import { logger } from '../config/logger';
 import { config } from '../config';
 import { superviseWorker } from './supervision';
@@ -21,6 +23,10 @@ const processor = async (job: any) => {
 			return cleanupOrphansProcessor(job);
 		case 'cleanup-duplicates':
 			return cleanupDuplicatesProcessor(job);
+		case 'merge-mailboxes':
+			return mergeMailboxesProcessor(job);
+		case 'unmerge-mailbox':
+			return unmergeMailboxProcessor(job);
 		default:
 			throw new Error(`Unknown job name: ${job.name}`);
 	}

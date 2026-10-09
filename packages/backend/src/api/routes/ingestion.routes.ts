@@ -601,6 +601,184 @@ export const createIngestionRouter = (
 		ingestionController.unmerge
 	);
 
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/{id}/mailboxes/merge-preview:
+	 *   get:
+	 *     summary: Preview a mailbox merge
+	 *     description: Reports what merging one mailbox of the source's merge group into another would do — emails to move, messages both mailboxes hold, whether the target already exists — and whether the merge can run now. Changes nothing. Requires `update:ingestion` permission.
+	 *     operationId: previewMailboxMerge
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *       - name: from
+	 *         in: query
+	 *         required: true
+	 *         description: The mailbox to merge away.
+	 *         schema:
+	 *           type: string
+	 *       - name: into
+	 *         in: query
+	 *         required: true
+	 *         description: The mailbox to merge into. It does not need to exist yet.
+	 *         schema:
+	 *           type: string
+	 *     responses:
+	 *       '200':
+	 *         description: Merge preview. `blockedReason` is null when the merge can run.
+	 *       '400':
+	 *         description: Missing or malformed mailbox address.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 */
+	router.get(
+		'/:id/mailboxes/merge-preview',
+		requirePermission('update', 'ingestion', { loadResource: ingestionResource }),
+		ingestionController.previewMailboxMerge
+	);
+
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/{id}/mailboxes/merge:
+	 *   post:
+	 *     summary: Merge one mailbox into another
+	 *     description: Merges a mailbox of the source's merge group into another mailbox of the same group. Archived emails are moved in the background, and mail still synced from the merged mailbox is archived under the target from now on. Nothing in storage is moved. With `collapseDuplicates`, copies of a message both mailboxes held are reduced to one; that needs deletion enabled and `delete:ingestion` permission, and never removes a copy under legal hold, a retention label, or journaling. Requires `update:ingestion` permission.
+	 *     operationId: mergeMailboxes
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             type: object
+	 *             required: [from, into]
+	 *             properties:
+	 *               from:
+	 *                 type: string
+	 *               into:
+	 *                 type: string
+	 *               collapseDuplicates:
+	 *                 type: boolean
+	 *                 default: false
+	 *     responses:
+	 *       '202':
+	 *         description: Merge queued.
+	 *       '400':
+	 *         description: Malformed address, or the mailbox would be merged into itself.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '403':
+	 *         description: Duplicate removal requested without deletion enabled or without permission to delete.
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 *       '409':
+	 *         description: The mailbox is already merged elsewhere, or a sync or another merge is running.
+	 */
+	router.post(
+		'/:id/mailboxes/merge',
+		requirePermission('update', 'ingestion', { loadResource: ingestionResource }),
+		ingestionController.mergeMailboxes
+	);
+
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/{id}/mailboxes/unmerge:
+	 *   post:
+	 *     summary: Unmerge a mailbox
+	 *     description: Undoes a mailbox merge. The alias is removed and the emails that were moved are moved back in the background. Copies removed as duplicates during the merge are not restored by this; live sources archive them again on their next sync. Requires `update:ingestion` permission.
+	 *     operationId: unmergeMailbox
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             type: object
+	 *             required: [mailbox]
+	 *             properties:
+	 *               mailbox:
+	 *                 type: string
+	 *                 description: The mailbox that was merged away.
+	 *     responses:
+	 *       '202':
+	 *         description: Unmerge queued.
+	 *       '400':
+	 *         description: Malformed address.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '404':
+	 *         description: The source does not exist, or the mailbox is not merged.
+	 *       '409':
+	 *         description: A sync or a merge is running.
+	 */
+	router.post(
+		'/:id/mailboxes/unmerge',
+		requirePermission('update', 'ingestion', { loadResource: ingestionResource }),
+		ingestionController.unmergeMailbox
+	);
+
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/{id}/mailbox-aliases:
+	 *   get:
+	 *     summary: List merged mailboxes
+	 *     description: Lists the mailboxes of the source's merge group that were merged into another mailbox. Requires `read:ingestion` permission.
+	 *     operationId: listMailboxAliases
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *     responses:
+	 *       '200':
+	 *         description: Mailbox aliases, oldest first.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 */
+	router.get(
+		'/:id/mailbox-aliases',
+		requirePermission('read', 'ingestion', { loadResource: ingestionResource }),
+		ingestionController.listMailboxAliases
+	);
+
 	// Withheld from the API reference while the feature is held back: the endpoints answer 503
 	// (see IngestionController.DUPLICATE_CLEANUP_ENABLED). The @openapi blocks were removed so
 	// the generated spec does not advertise them; restore them when the feature ships.

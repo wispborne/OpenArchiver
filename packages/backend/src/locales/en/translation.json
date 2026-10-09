@@ -61,6 +61,19 @@
 		"oauthAuthorizeFailed": "Could not start the mailbox authorization.",
 		"oauthPollFailed": "Could not check the authorization status."
 	},
+	"mailboxMerge": {
+		"queued": "Mailbox merge started. Emails are moved in the background.",
+		"unmergeQueued": "Mailbox unmerge started. Emails are moved back in the background.",
+		"invalidAddress": "Mailboxes must be given as addresses, without spaces.",
+		"same_mailbox": "A mailbox cannot be merged into itself.",
+		"circular": "The target mailbox is already merged into this mailbox.",
+		"already_merged": "This mailbox is already merged into another mailbox. Unmerge it first.",
+		"sync_running": "A sync is running for this ingestion source. Try again when it has finished.",
+		"merge_running": "A mailbox merge or unmerge is already running for this ingestion source.",
+		"not_merged": "This mailbox is not merged into another mailbox.",
+		"deletion_disabled": "Deletion is disabled for this instance. Set ENABLE_DELETION=true to remove duplicate emails.",
+		"noDeletePermission": "Removing duplicate emails requires permission to delete from this ingestion source."
+	},
 	"archivedEmail": {
 		"notFound": "Archived email not found"
 	},
