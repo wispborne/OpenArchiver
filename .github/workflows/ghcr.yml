@@ -1,0 +1,62 @@
+name: ghcr
+
+# Builds the fork's image and publishes it to GitHub Container Registry on every push to main.
+# Tags: the first 12 characters of the commit SHA (what Zephyrus's update.sh pins) and `main`.
+# Lives in its own file so merges from upstream never conflict with it; upstream's
+# docker-deployment / release-tag workflows are disabled in this repo's Actions settings instead.
+
+on:
+    push:
+        branches:
+            - main
+        paths-ignore:
+            - '**.md'
+            - 'docs/**'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    packages: write
+
+concurrency:
+    group: ghcr-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    image:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Image name and tag
+              id: meta
+              run: |
+                  echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/open-archiver" >> "$GITHUB_OUTPUT"
+                  echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+            - name: Log in to GHCR
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./apps/open-archiver/Dockerfile
+                  platforms: linux/amd64
+                  push: true
+                  tags: |
+                      ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+                      ${{ steps.meta.outputs.image }}:main
+                  labels: |
+                      org.opencontainers.image.source=https://github.com/${{ github.repository }}
+                      org.opencontainers.image.revision=${{ github.sha }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max

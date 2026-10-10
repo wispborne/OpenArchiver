@@ -44,7 +44,7 @@ Leave the option off to keep both copies.
 
 The source's statistics page lists merged mailboxes under **Merged mailboxes**. Click **Unmerge** next to one to undo its merge. The alias is removed, and the emails that came from that mailbox are moved back in the background. That includes emails archived from it after the merge.
 
-Copies removed as duplicates during the merge are not restored by an unmerge. Live sources (IMAP, Google Workspace, Microsoft 365) can archive those messages again on their next sync, but only when the provider still offers them; file imports (PST, EML, Mbox) cannot.
+Copies removed as duplicates during the merge are not restored by an unmerge, and later syncs don't bring them back either: live sources (IMAP, Google Workspace, Microsoft 365) only fetch mail that arrived since their last sync, even on **Force Sync**, and file imports (PST, EML, Mbox) don't sync at all. The copy kept in the target mailbox stays in the archive, so the message itself is not lost; after an unmerge it is listed only under the target mailbox.
 
 ## Access control
 
