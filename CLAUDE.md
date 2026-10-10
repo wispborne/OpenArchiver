@@ -55,18 +55,23 @@ pnpm docs:gen-spec                                                        # rege
 
 There is no automated test suite. Verify changes by running them:
 
-- Postgres 16, Redis and Chromium are available in cloud sessions. A Meilisearch binary can be downloaded from GitHub releases; match the version in `docker-compose.yml`.
+- In cloud sessions, `.claude/hooks/session-start.sh` runs at startup. It installs dependencies (working around the `xlsx` failure below), builds `@open-archiver/types`, starts Postgres with a superuser `oa` / password `oa` and a database `oa` (`DATABASE_URL=postgresql://oa:oa@localhost:5432/oa`), and starts Redis on the default port. It does not fetch Meilisearch: download that binary from GitHub releases when you need search, matching the version in `docker-compose.yml`. Chromium is preinstalled.
 - Run migrations with `ts-node-dev --transpile-only src/database/migrate.ts`.
 - Start the API with `node apps/open-archiver/dist/index.js` and the workers from `packages/backend/dist/workers/` after `pnpm --filter @open-archiver/backend build && pnpm --filter open-archiver-app build`.
 - Start the frontend with `vite dev` in `packages/frontend`. It proxies `/api` to `PORT_BACKEND`.
 - The API needs at least `DATABASE_URL`, `REDIS_*`, `MEILI_HOST`, `MEILI_MASTER_KEY`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `ENCRYPTION_KEY`, `STORAGE_TYPE=local`, `STORAGE_LOCAL_ROOT_PATH` and `PORT_BACKEND`. Create the first user with `POST /v1/auth/setup`.
 - Drive the UI with Playwright (`/opt/node-tools/node_modules/playwright`). Wait for `networkidle` before interacting: Vite reloads the page the first time it optimizes dependencies.
+- To seed test mail, create an `mbox_import` source with `providerConfig.localFilePath` pointing at an mbox file you wrote; the ingestion worker imports it. Duplicates or other edge cases are easiest to add afterwards with SQL.
+- A source page's index coverage (`IngestionStats.indexedCount`) counts rows with `is_indexed = true` in Postgres. It is not read from Meilisearch, so deleting a Meilisearch document does not lower it; set `is_indexed = false` to simulate unindexed mail.
 
 Known environment quirks:
 
-- **`xlsx` install failure:** the backend depends on `xlsx` from `cdn.sheetjs.com`, which the sandbox proxy may block (403). For a local-only install, temporarily add `pnpm.overrides.xlsx = "0.18.5"` to the root `package.json`, run `pnpm install --no-frozen-lockfile`, then restore `package.json` and `pnpm-lock.yaml`. Never commit that override.
+- **`xlsx` install failure:** the backend depends on `xlsx` from `cdn.sheetjs.com`, which the sandbox proxy may block (403). For a local-only install, temporarily add `pnpm.overrides.xlsx = "0.18.5"` to the root `package.json`, run `pnpm install --no-frozen-lockfile`, then restore `package.json` and `pnpm-lock.yaml`. Never commit that override. The session-start hook does this for you; repeat it by hand only if you reinstall later.
+- **Types build emits nothing:** `packages/types` is a composite (incremental) build. If `dist/` is gone but `tsconfig.tsbuildinfo` remains, `tsc` decides nothing changed and writes nothing. Delete the `.tsbuildinfo` and build again.
+- **`dump.rdb` in the repo:** `redis-server` writes its snapshot into its working directory. Start it from `/tmp` with `--save ""`, as the hook does; delete a stray `dump.rdb`, never commit it.
+- **Stopping a server:** `pkill -f <pattern>` also matches the shell running the command when that command line contains the pattern, and kills it (exit code 144). Find the PID with `ps -eo pid,comm,args` filtered on `comm` instead.
 - **Drizzle schema drift:** the schema doesn't declare four `journaling_sources` columns that migration 0042 added (they are probably used by enterprise). `db:generate` will try to `DROP` them. Delete those statements from any new migration and keep the snapshot's `journaling_sources` columns as they were.
-- **Formatting:** prettier formats JSON with tabs. Some committed files (`openapi.json`, migration meta, a few Svelte pages) were never prettier-clean upstream, so only format files you create or substantially rewrite.
+- **Formatting:** prettier formats JSON with tabs. Some committed files (`openapi.json`, migration meta, a few Svelte pages) were never prettier-clean upstream, so only format files you create or substantially rewrite, or files that were already clean. To check whether a file was clean before your change: `git show HEAD:<path> | npx prettier --check --stdin-filepath <path>`.
 
 ## Backend conventions
 
@@ -104,6 +109,9 @@ Known environment quirks:
 - Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`, `$bindable`). Pages load data in `+page.server.ts` with `$lib/server/api`; client-side calls use `$lib/api.client` (`api('/path', init)`, prefixed with `/api/v1`).
 - Use the existing shadcn-svelte components in `src/lib/components/ui/` (generated files that prettier ignores) and put custom components in `src/lib/components/custom/`. Show feedback with `setAlert(...)`, and call `invalidateAll()` after mutations that change loaded data.
 - All text goes through `$t('app.…')`, including pluralization-free wording (there is no plural support, so avoid "1 emails" phrasings).
+- Ingestion-source actions used on more than one page (force sync, reindex) live in `$lib/ingestionActions.ts`, which also reports their outcome. Link to a filtered search with its `searchUrl({ from, to, mailboxes, sources })`; the search page reads those filters from the URL and shows them in its filter panel. Scope `sources` to the merge group's root, since a child's mail is indexed under the root's id.
+- layerchart `BarChart` (band tooltip mode) lays transparent full-width tooltip rects over the bars, so `onBarClick` never fires. Use `onTooltipClick`.
+- Don't set `disabled` on a bits-ui `DropdownMenu.Item` from state its own `onclick` changes: the item disables itself mid-click, the menu stays open and the page stops taking clicks. Ignore repeat clicks inside the handler instead.
 - For UI/UX work, check the result in a real browser at desktop and phone widths and look at the screenshots before calling it done.
 
 ## MCP server (planned)
