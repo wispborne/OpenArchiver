@@ -59,6 +59,7 @@ import { FilterBuilder } from './FilterBuilder';
 import { AuditService } from './AuditService';
 import { User } from '@open-archiver/types';
 import { checkDeletionEnabled } from '../helpers/deletionGuard';
+import { stripNulFromEmail } from '../helpers/stripNul';
 import { normalizeEmailAddress } from '../helpers/emailAddress';
 import { mapWithConcurrency } from '../helpers/mapWithConcurrency';
 import { truncateToBytes } from '../helpers/truncateToBytes';
@@ -1613,6 +1614,9 @@ export class IngestionService {
 		rawUserEmail: string,
 		skipTempFileCleanup: boolean = false
 	): Promise<PendingEmail | ProcessEmailError | null> {
+		// Before anything reads the email: Postgres rejects NUL in a text value, so one in a subject
+		// or name failed the whole insert and the message was lost for good. See stripNul.
+		stripNulFromEmail(email);
 		// Normalized once here so the dedup gates and all three inserts below agree on what
 		// counts as the same mailbox, whatever casing or padding the provider sent.
 		const providerMailbox = normalizeEmailAddress(rawUserEmail);
