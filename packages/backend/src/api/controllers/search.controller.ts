@@ -1,7 +1,13 @@
 import { Request, Response } from 'express';
 import { SearchService } from '../../services/SearchService';
 import { MatchingStrategies } from 'meilisearch';
-import type { SearchFilters, SearchScope, SearchSortOption } from '@open-archiver/types';
+import type {
+	SearchCropAttribute,
+	SearchField,
+	SearchFilters,
+	SearchScope,
+	SearchSortOption,
+} from '@open-archiver/types';
 import { normalizeEmailAddress } from '../../helpers/emailAddress';
 
 const SEARCH_SCOPES: SearchScope[] = [
@@ -14,6 +20,26 @@ const SEARCH_SCOPES: SearchScope[] = [
 ];
 const FACET_FIELDS = ['mailboxes', 'from'];
 const SORT_OPTIONS: SearchSortOption[] = ['relevance', 'date_desc', 'date_asc'];
+// Every attribute an indexed document has. `fields` is checked against this list, so a typo is a
+// 400 rather than a silently empty attribute, and nothing outside the document can be asked for.
+// `attachments.filename` lists attachment names without their extracted text.
+const DOCUMENT_FIELDS: SearchField[] = [
+	'id',
+	'userEmail',
+	'from',
+	'fromName',
+	'to',
+	'cc',
+	'bcc',
+	'subject',
+	'body',
+	'attachments',
+	'attachments.filename',
+	'timestamp',
+	'ingestionSourceId',
+	'hasAttachments',
+];
+const CROP_ATTRIBUTES: SearchCropAttribute[] = ['subject', 'body', 'attachments.content'];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -119,6 +145,29 @@ export class SearchController {
 				return;
 			}
 
+			// Result shaping. Without these the response is unchanged; with them, API clients that
+			// only want a list of hits (the MCP server) avoid downloading every body and attachment
+			// text twice.
+			const fields = csv(req.query.fields) as SearchField[] | undefined;
+			if (fields && fields.some((field) => !DOCUMENT_FIELDS.includes(field))) {
+				res.status(400).json({ message: req.t('search.invalidFields') });
+				return;
+			}
+			const crop = csv(req.query.crop) as SearchCropAttribute[] | undefined;
+			if (crop && crop.some((attribute) => !CROP_ATTRIBUTES.includes(attribute))) {
+				res.status(400).json({ message: req.t('search.invalidCrop') });
+				return;
+			}
+			let cropLength: number | undefined;
+			if (req.query.cropLength !== undefined) {
+				const raw = req.query.cropLength;
+				cropLength = Number(raw);
+				if (!crop || typeof raw !== 'string' || !/^\d+$/.test(raw) || cropLength < 1) {
+					res.status(400).json({ message: req.t('search.invalidCropLength') });
+					return;
+				}
+			}
+
 			const hasFilters = Object.keys(filters).length > 0;
 
 			// Keywords are required unless at least one filter is present
@@ -139,6 +188,9 @@ export class SearchController {
 					page: Math.max(1, Number.parseInt(page as string, 10) || 1),
 					limit: Math.min(100, Math.max(1, Number.parseInt(limit as string, 10) || 10)),
 					matchingStrategy: matchingStrategy as MatchingStrategies,
+					fields,
+					crop,
+					cropLength,
 				},
 				userId,
 				req.ip || 'unknown'

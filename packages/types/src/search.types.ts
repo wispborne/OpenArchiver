@@ -41,6 +41,15 @@ export interface SearchFilters {
 	hasAttachments?: boolean;
 }
 
+/**
+ * Attributes `fields` can ask for: any document attribute, plus `attachments.filename` for the
+ * attachment names without their (possibly very large) extracted text.
+ */
+export type SearchField = keyof EmailDocument | 'attachments.filename';
+
+/** Text attributes of a search hit that `crop` can shorten to an excerpt around the match. */
+export type SearchCropAttribute = 'subject' | 'body' | 'attachments.content';
+
 export interface SearchQuery {
 	query: string;
 	filters?: SearchFilters;
@@ -49,6 +58,12 @@ export interface SearchQuery {
 	page?: number;
 	limit?: number;
 	matchingStrategy?: MatchingStrategy;
+	/** Return only these document attributes (plus `id`). All attributes when omitted. */
+	fields?: SearchField[];
+	/** Return these attributes in `_formatted` as excerpts around the match. */
+	crop?: SearchCropAttribute[];
+	/** Excerpt length in words for `crop`. Meilisearch's default (10) when omitted. */
+	cropLength?: number;
 }
 
 export interface SearchHit extends EmailDocument {

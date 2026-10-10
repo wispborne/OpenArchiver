@@ -77,14 +77,19 @@
 		"noDeletePermission": "Removing duplicate emails requires permission to delete from this ingestion source."
 	},
 	"archivedEmail": {
-		"notFound": "Archived email not found"
+		"notFound": "Archived email not found",
+		"invalidFlag": "includeHtml and includeAttachmentText must be true or false",
+		"invalidMaxChars": "maxChars must be a positive whole number"
 	},
 	"search": {
 		"keywordsRequired": "Keywords are required when no filter is provided",
 		"invalidSourceId": "One or more ingestion source IDs are not valid",
 		"invalidDate": "Dates must use the yyyy-mm-dd format",
 		"invalidDateRange": "The start date must not be after the end date",
-		"invalidParam": "One or more search parameters have an invalid value"
+		"invalidParam": "One or more search parameters have an invalid value",
+		"invalidFields": "fields lists an attribute that search results don't have",
+		"invalidCrop": "crop can only name subject, body or attachments.content",
+		"invalidCropLength": "cropLength must be a positive whole number and needs crop"
 	},
 	"index": {
 		"cleanupTriggered": "Index cleanup has been queued."

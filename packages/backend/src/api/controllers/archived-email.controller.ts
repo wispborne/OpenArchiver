@@ -58,6 +58,63 @@ export class ArchivedEmailController {
 		}
 	};
 
+	public getArchivedEmailContent = async (req: Request, res: Response): Promise<Response> => {
+		try {
+			const { id } = req.params;
+			const userId = req.user?.sub;
+
+			if (!userId) {
+				return res.status(401).json({ message: req.t('errors.unauthorized') });
+			}
+
+			// Flags are strict `true`/`false` so a typo like `includeHtml=yes` is reported instead
+			// of silently meaning "no".
+			const flag = (value: unknown): boolean | null => {
+				if (value === undefined || value === 'false') return false;
+				return value === 'true' ? true : null;
+			};
+			const includeHtml = flag(req.query.includeHtml);
+			const includeAttachmentText = flag(req.query.includeAttachmentText);
+			if (includeHtml === null || includeAttachmentText === null) {
+				return res.status(400).json({ message: req.t('archivedEmail.invalidFlag') });
+			}
+
+			let maxChars: number | undefined;
+			if (req.query.maxChars !== undefined) {
+				maxChars = Number(req.query.maxChars);
+				if (
+					typeof req.query.maxChars !== 'string' ||
+					!/^\d+$/.test(req.query.maxChars) ||
+					maxChars < 1
+				) {
+					return res
+						.status(400)
+						.json({ message: req.t('archivedEmail.invalidMaxChars') });
+				}
+			}
+
+			const actor = await this.userService.findById(userId);
+			if (!actor) {
+				return res.status(401).json({ message: req.t('errors.unauthorized') });
+			}
+
+			const content = await ArchivedEmailService.getArchivedEmailContent(
+				id,
+				userId,
+				actor,
+				req.ip || 'unknown',
+				{ includeHtml, includeAttachmentText, maxChars }
+			);
+			if (!content) {
+				return res.status(404).json({ message: req.t('archivedEmail.notFound') });
+			}
+			return res.status(200).json(content);
+		} catch (error) {
+			console.error(`Get archived email content ${req.params.id} error:`, error);
+			return res.status(500).json({ message: req.t('errors.internalServerError') });
+		}
+	};
+
 	public deleteArchivedEmail = async (req: Request, res: Response): Promise<Response> => {
 		// Guard: return 400 if deletion is disabled in system settings before touching anything else
 		try {

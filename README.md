@@ -86,6 +86,8 @@ Kept current as the fork changes. Newest first within each group.
 
 **API additions** (all additive)
 
+- `GET /v1/archived-emails/{id}/content`: the email parsed on the server, with plain text (or the HTML rendered as text), optional HTML, attachments with their extracted text on request, the thread, and an optional `maxChars` limit. Same permissions and audit entry as `GET /v1/archived-emails/{id}`.
+- Optional `fields`, `crop` and `cropLength` on `GET /v1/search`, to return only some attributes and short excerpts around the match instead of every body and attachment text. Without them the response is unchanged.
 - `GET /v1/ingestion-sources/{id}/mailboxes/merge-status`, plus the mailbox merge endpoints (`merge-preview`, `merge`, `unmerge`, `mailbox-aliases`).
 - `GET .../duplicates` (count) and `POST .../duplicates/cleanup`, per source (`/v1/ingestion-sources/{id}/…`) and for the whole archive (`/v1/ingestion-sources/…`).
 - Jobs: `GET /v1/jobs/queues/{queue}/jobs/{id}` (with the job's log), job retry and remove, retry all failed jobs, clean, pause and resume.

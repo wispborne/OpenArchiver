@@ -139,6 +139,156 @@ export const createArchivedEmailRouter = (
 		archivedEmailController.getArchivedEmailById
 	);
 
+	/**
+	 * @openapi
+	 * /v1/archived-emails/{id}/content:
+	 *   get:
+	 *     summary: Get an archived email's parsed content
+	 *     description: >-
+	 *       Returns the email parsed on the server, with readable text instead of the raw .eml bytes
+	 *       that `GET /v1/archived-emails/{id}` returns. Meant for API clients such as the MCP server.
+	 *       Applies the same permission check and writes the same READ audit entry as
+	 *       `GET /v1/archived-emails/{id}`, and returns the same thread. `text` is the plain-text body,
+	 *       or a text rendering of the HTML body when the email has no plain-text part. Requires
+	 *       `read:archive` permission.
+	 *     operationId: getArchivedEmailContent
+	 *     tags:
+	 *       - Archived Emails
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         description: The ID of the archived email.
+	 *         schema:
+	 *           type: string
+	 *       - name: includeHtml
+	 *         in: query
+	 *         required: false
+	 *         description: Also return the HTML body in `html` (null when the email has none).
+	 *         schema:
+	 *           type: boolean
+	 *           default: false
+	 *       - name: includeAttachmentText
+	 *         in: query
+	 *         required: false
+	 *         description: >-
+	 *           Also return each attachment's text, as extracted when the email was indexed. The text
+	 *           is null when the email is not indexed or nothing could be extracted.
+	 *         schema:
+	 *           type: boolean
+	 *           default: false
+	 *       - name: maxChars
+	 *         in: query
+	 *         required: false
+	 *         description: Cut `text` to this many characters and set `truncated`. Unlimited when omitted.
+	 *         schema:
+	 *           type: integer
+	 *           minimum: 1
+	 *     responses:
+	 *       '200':
+	 *         description: The parsed email.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               required: [id, from, to, cc, bcc, sentAt, references, userEmail, text, attachments, thread, truncated]
+	 *               properties:
+	 *                 id:
+	 *                   type: string
+	 *                 subject:
+	 *                   type: string
+	 *                   nullable: true
+	 *                 from:
+	 *                   $ref: '#/components/schemas/Recipient'
+	 *                 to:
+	 *                   type: array
+	 *                   items:
+	 *                     $ref: '#/components/schemas/Recipient'
+	 *                 cc:
+	 *                   type: array
+	 *                   items:
+	 *                     $ref: '#/components/schemas/Recipient'
+	 *                 bcc:
+	 *                   type: array
+	 *                   items:
+	 *                     $ref: '#/components/schemas/Recipient'
+	 *                 sentAt:
+	 *                   type: string
+	 *                   format: date-time
+	 *                 messageId:
+	 *                   type: string
+	 *                   nullable: true
+	 *                 inReplyTo:
+	 *                   type: string
+	 *                   nullable: true
+	 *                 references:
+	 *                   type: array
+	 *                   items:
+	 *                     type: string
+	 *                 userEmail:
+	 *                   type: string
+	 *                   description: The mailbox the email belongs to.
+	 *                 ingestionSource:
+	 *                   type: object
+	 *                   nullable: true
+	 *                   properties:
+	 *                     id:
+	 *                       type: string
+	 *                     name:
+	 *                       type: string
+	 *                 text:
+	 *                   type: string
+	 *                 html:
+	 *                   type: string
+	 *                   nullable: true
+	 *                   description: Only present when `includeHtml=true`.
+	 *                 attachments:
+	 *                   type: array
+	 *                   items:
+	 *                     type: object
+	 *                     properties:
+	 *                       id:
+	 *                         type: string
+	 *                       filename:
+	 *                         type: string
+	 *                       mimeType:
+	 *                         type: string
+	 *                         nullable: true
+	 *                       sizeBytes:
+	 *                         type: integer
+	 *                       text:
+	 *                         type: string
+	 *                         nullable: true
+	 *                         description: Only present when `includeAttachmentText=true`.
+	 *                 thread:
+	 *                   type: array
+	 *                   items:
+	 *                     $ref: '#/components/schemas/ThreadEmail'
+	 *                 truncated:
+	 *                   type: boolean
+	 *                   description: Whether `text` was cut to `maxChars`.
+	 *       '400':
+	 *         description: A flag is not `true` or `false`, or `maxChars` is not a positive whole number.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/ErrorMessage'
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 *       '500':
+	 *         $ref: '#/components/responses/InternalServerError'
+	 */
+	router.get(
+		'/:id/content',
+		requirePermission('read', 'archive'),
+		archivedEmailController.getArchivedEmailContent
+	);
+
 	router.delete(
 		'/:id',
 		requirePermission('delete', 'archive', { loadResource: archivedEmailResource }),

@@ -338,6 +338,9 @@ export class SearchService {
 			page = 1,
 			limit = 10,
 			matchingStrategy = 'last',
+			fields,
+			crop,
+			cropLength,
 		} = dto;
 		const index = await this.getIndex<EmailDocument>('emails');
 
@@ -348,6 +351,27 @@ export class SearchService {
 			showMatchesPosition: true,
 			matchingStrategy,
 		};
+
+		// Optional result shaping. Left alone when neither is given, so existing clients (the
+		// frontend reads `_formatted` for every field) get exactly the response they always had.
+		// When either is given, highlighting is narrowed to what was asked for; with `['*']` the
+		// `_formatted` copy would still carry every body and attachment text in full. Meilisearch
+		// puts cropped attributes into `_formatted` even when they aren't retrieved, so a crop
+		// never needs the full attribute alongside it.
+		if (fields || crop) {
+			if (fields) {
+				searchParams.attributesToRetrieve = Array.from(new Set(['id', ...fields]));
+			}
+			if (crop) {
+				searchParams.attributesToCrop = crop;
+				if (cropLength) {
+					searchParams.cropLength = cropLength;
+				}
+			}
+			searchParams.attributesToHighlight = Array.from(
+				new Set([...(fields ?? []), ...(crop ?? [])])
+			);
+		}
 
 		// Sorting: default stays newest-first; 'relevance' omits sort so Meilisearch ranking applies.
 		if (sort === 'date_asc') {

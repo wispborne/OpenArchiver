@@ -137,6 +137,36 @@ export const createSearchRouter = (
 	 *           type: string
 	 *           enum: [last, all, frequency]
 	 *           default: last
+	 *       - name: fields
+	 *         in: query
+	 *         required: false
+	 *         description: >-
+	 *           Comma-separated document attributes to return in each hit (`id` is always included).
+	 *           One of id, userEmail, from, fromName, to, cc, bcc, subject, body, attachments,
+	 *           attachments.filename (names without the extracted text), timestamp, ingestionSourceId,
+	 *           hasAttachments. When `fields` or `crop` is given,
+	 *           `_formatted` only covers the returned and cropped attributes. All attributes when omitted.
+	 *         schema:
+	 *           type: string
+	 *           example: subject,from,timestamp
+	 *       - name: crop
+	 *         in: query
+	 *         required: false
+	 *         description: >-
+	 *           Comma-separated text attributes to return in `_formatted` as excerpts around the best
+	 *           match, with matches highlighted. One of subject, body, attachments.content. Cropped
+	 *           attributes appear in `_formatted` even when `fields` doesn't list them.
+	 *         schema:
+	 *           type: string
+	 *           example: body
+	 *       - name: cropLength
+	 *         in: query
+	 *         required: false
+	 *         description: Excerpt length in words for `crop`. Requires `crop`.
+	 *         schema:
+	 *           type: integer
+	 *           minimum: 1
+	 *           default: 10
 	 *     responses:
 	 *       '200':
 	 *         description: Search results.
