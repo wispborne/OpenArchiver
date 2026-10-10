@@ -12,6 +12,7 @@ Also keep the fork easy to sync with upstream: prefer new files and small, well-
 
 ## Workflow
 
+- If a request would be too hard or too risky for this project (data loss in the archive, a breaking API change, a large divergence from upstream, more work than it is worth), say so plainly before starting, and propose a smaller or safer alternative. The user prefers that to a half-working or fragile result.
 - Commit directly to `main`. No PRs or feature branches unless asked.
 - Every push to `main` that touches anything other than Markdown or `docs/` builds and publishes the Docker image `ghcr.io/wispborne/open-archiver` (tags: first 12 characters of the SHA, `main`, `latest`). This is done by `.github/workflows/ghcr.yml`. The deployment pins images by SHA, so a broken push ships a broken image: typecheck, and run the change for real, before pushing. Upstream's Docker Hub workflows (`docker-deployment.yml`, `release-tag.yml`) are disabled in the repo's Actions settings. Keep fork-only CI in separate files so upstream merges don't conflict with it.
 - `git fetch origin main` before starting work. Other sessions also push to `main`.
