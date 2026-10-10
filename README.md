@@ -1,3 +1,62 @@
+> [!NOTE]
+> **This is [wispborne](https://github.com/wispborne)'s fork of [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver).** It tracks upstream and adds UI and reliability work on top. Everything below the line is upstream's README, unchanged.
+
+## About this fork
+
+**Image:** `ghcr.io/wispborne/open-archiver`, rebuilt on every push to `main` that changes code. Tags: `latest`, `main`, and the first 12 characters of the commit SHA. To run it, use upstream's `docker-compose.yml` with the `open-archiver` service's `image:` changed to this one. Pin a SHA tag if you want to choose when you update.
+
+**Compatibility:**
+
+- The REST API only grows: new endpoints and new optional fields. Existing endpoints, fields and status codes behave as upstream's, so existing API clients keep working.
+- The fork adds one database migration (`0045`: the `mailbox_aliases` table and an `original_user_email` column on `archived_emails`, both for mailbox merges). It runs automatically on start. Moving a database back to upstream's image afterwards is untested.
+
+### Differences from upstream
+
+Kept current as the fork changes. Newest first within each group.
+
+**New features**
+
+- **Background jobs on the dashboard.** Super Admins see each queue's worker status and counts, and the jobs running now with their progress.
+- **Jobs page redesign** (Admin → Jobs).
+    - Each queue shows whether its worker is running and whether it is paused, with job counts by state.
+    - A detail view for every job: progress, error and stack trace, its log, its input and its result.
+    - Every job now writes log lines when it starts and ends.
+    - Controls: pause and resume a queue, retry failed indexing jobs, and remove or clear finished jobs.
+    - See [Background Jobs](docs/user-guides/background-jobs.md).
+- **Mailbox merge progress.** A source's page shows a running merge or unmerge, step by step, and afterwards how it ended, with Retry if it failed.
+- **More things are clickable.**
+    - Dashboard: the totals, the storage chart and the Top Senders chart lead to their lists, sources and searches.
+    - A source's page has an Actions menu (Force Sync, Reindex, Remove duplicates), Search this source, a Reindex missing button when coverage is incomplete, and per-mailbox searches.
+    - An email's page has a Back link, and its sender, recipients and mailbox lead to filtered searches.
+- **Remove duplicate emails** from one ingestion source (Actions menu on the source page, or the row menu on the sources list).
+    - Upstream built the cleanup but shipped it switched off. The fork turns it on and adds the dialog.
+    - It also fixes merge groups, which reported no duplicates, and stops it offering copies it will never remove.
+    - See [Removing Duplicate Emails](docs/user-guides/removing-duplicates.md).
+- **Merge two mailboxes** within an ingestion source, and unmerge them. Mail still synced from the merged mailbox lands in the target from then on. See [Merging Mailboxes](docs/user-guides/email-providers/merging-mailboxes.md).
+
+**Fixes**
+
+- Force Sync no longer starts a second sync of a mailbox that is still syncing. Two syncs of one mailbox could archive emails twice, and could leave the ingestion worker stuck.
+- Emails containing a NUL character (seen in subjects) are archived. Before, Postgres refused them, and IMAP sync never tried them again; emails that failed that way before this fix are still missing until their mailbox is re-scanned.
+- A stuck Meilisearch queue no longer grows without bound. Workers hold documents back once `MEILI_MAX_PENDING_TASKS` (default 1000) tasks are waiting. They also check on Meilisearch tasks every 500 ms instead of every 50 ms (`MEILI_WAIT_FOR_TASK_INTERVAL`). See [Search Index Stuck](docs/user-guides/troubleshooting/search-index-stuck.md).
+- A rebuilt backend picks up new translations. Before, the build copied them into a nested folder, so new messages showed as raw keys. Docker images, which build from scratch, were not affected.
+- Storage sizes show `0 Bytes`, not `NaN undefined`, for a source with no mail.
+
+**API additions** (all additive)
+
+- `GET /v1/ingestion-sources/{id}/mailboxes/merge-status`, plus the mailbox merge endpoints (`merge-preview`, `merge`, `unmerge`, `mailbox-aliases`).
+- `GET .../duplicates` (count) and `POST .../duplicates/cleanup`, per source (`/v1/ingestion-sources/{id}/…`) and for the whole archive (`/v1/ingestion-sources/…`).
+- Jobs: `GET /v1/jobs/queues/{queue}/jobs/{id}` (with the job's log), job retry and remove, retry all failed jobs, clean, pause and resume.
+- Optional fields: `isPaused`, `workerAlive` and `prioritized` on queues; `progress`, `ingestionSourceName`, `canRetry`, `canRemove` and `attemptsAllowed` on jobs; `alreadyRunning` on Force Sync.
+
+**For developers**
+
+- [`CLAUDE.md`](CLAUDE.md) describes the fork's goals, conventions and known pitfalls.
+- `.claude/hooks/session-start.sh` prepares Claude Code cloud sessions.
+- `.github/workflows/ghcr.yml` publishes the image. Upstream's Docker Hub workflows are disabled in this repository.
+
+---
+
 # Open Archiver
 
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)

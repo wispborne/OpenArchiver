@@ -16,8 +16,9 @@ Also keep the fork easy to sync with upstream: prefer new files and small, well-
 - Commit directly to `main`. No PRs or feature branches unless asked.
 - Every push to `main` that touches anything other than Markdown or `docs/` builds and publishes the Docker image `ghcr.io/wispborne/open-archiver` (tags: first 12 characters of the SHA, `main`, `latest`). This is done by `.github/workflows/ghcr.yml`. The deployment pins images by SHA, so a broken push ships a broken image: typecheck, and run the change for real, before pushing. Upstream's Docker Hub workflows (`docker-deployment.yml`, `release-tag.yml`) are disabled in the repo's Actions settings. Keep fork-only CI in separate files so upstream merges don't conflict with it.
 - `git fetch origin main` before starting work. Other sessions also push to `main`.
+- `README.md` opens with a fork section whose "Differences from upstream" list is kept current. A commit that adds or changes something a user or API client would notice updates that list in the same commit; internal refactors and docs-only changes don't. Keep the section above upstream's `# Open Archiver` title so upstream README changes still merge cleanly.
 - Commit messages follow the existing style: `feat(scope): …`, `fix(scope): …`, imperative mood, first line ≤ 72 characters, with a body that explains why.
-- To sync upstream: `git remote add upstream https://github.com/LogicLabs-OU/OpenArchiver` (if missing), `git fetch upstream`, then merge `upstream/main` into `main`. Upstream sometimes squashes enterprise-edition commits into one ("ee commit …").
+- To sync upstream: `git remote add upstream https://github.com/LogicLabs-OU/OpenArchiver` (if missing), `git fetch upstream`, then merge `upstream/main` into `main`. Upstream sometimes squashes enterprise-edition commits into one ("ee commit …"). The fork's own migration is `0045` (mailbox merge); if upstream ships a migration with the same number, the two journals conflict and one has to be renumbered. After a sync, remove anything from the README's differences list that upstream now has too.
 
 ## Repository layout
 
