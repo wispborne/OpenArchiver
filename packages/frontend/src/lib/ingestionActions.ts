@@ -9,13 +9,27 @@ import { t } from '$lib/translations';
  * the outcome the same way. Each one shows its own alert.
  */
 
-/** Asks for an immediate sync. Returns whether the request was accepted. */
+/**
+ * Asks for an immediate sync. Returns whether a new sync was started: false when the request failed
+ * and also when a sync was still running, which the server leaves alone rather than run a second
+ * one beside it.
+ */
 export const forceSync = async (id: string): Promise<boolean> => {
 	const $t = get(t);
 	try {
 		const res = await api(`/ingestion-sources/${id}/sync`, { method: 'POST' });
+		const body = await res.json().catch(() => ({}));
+		if (res.ok && body.alreadyRunning) {
+			setAlert({
+				type: 'warning',
+				title: $t('app.ingestions.force_sync_already_running'),
+				message: body.message ?? '',
+				duration: 10000,
+				show: true,
+			});
+			return false;
+		}
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			setAlert({
 				type: 'error',
 				title: $t('app.ingestions.force_sync_failed'),

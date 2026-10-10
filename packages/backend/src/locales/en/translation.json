@@ -52,6 +52,7 @@
 		"notFound": "Ingestion source not found",
 		"initialImportTriggered": "Initial import triggered successfully.",
 		"forceSyncTriggered": "Force sync triggered successfully.",
+		"forceSyncAlreadyRunning": "A sync of this source is still running, so nothing new was started. If it is stuck, restart the ingestion worker. The stuck sync is then marked failed, and a new one starts by itself within about 40 minutes.",
 		"reindexTriggered": "Reindex triggered successfully.",
 		"duplicateCleanupTriggered": "Duplicate cleanup started. It runs in the background.",
 		"duplicateCleanupUnavailable": "Duplicate email cleanup is not available in this version.",

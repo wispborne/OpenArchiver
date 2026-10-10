@@ -295,8 +295,21 @@ export class IngestionController {
 					.status(400)
 					.json({ message: req.t('ingestion.journalingSourceManagedByJournaling') });
 			}
-			await IngestionService.triggerForceSync(id, actor, req.ip || 'unknown');
-			return res.status(202).json({ message: req.t('ingestion.forceSyncTriggered') });
+			const { alreadyRunning } = await IngestionService.triggerForceSync(
+				id,
+				actor,
+				req.ip || 'unknown'
+			);
+			// Still 202 either way: the request was accepted, and a sync is under way. The field
+			// tells a client which one, so it can say so instead of promising a fresh start.
+			return res.status(202).json({
+				message: req.t(
+					alreadyRunning
+						? 'ingestion.forceSyncAlreadyRunning'
+						: 'ingestion.forceSyncTriggered'
+				),
+				alreadyRunning,
+			});
 		} catch (error) {
 			console.error(`Trigger force sync for ${req.params.id} error:`, error);
 			if (error instanceof Error && error.message === 'Ingestion source not found') {

@@ -1001,7 +1001,15 @@ export class IngestionService {
 		};
 	}
 
-	public static async triggerForceSync(id: string, actor: User, actorIp: string): Promise<void> {
+	/**
+	 * Restarts a source's sync. Returns `alreadyRunning: true`, having changed nothing, when a sync
+	 * of the source is still being worked on and so could not be cleared away.
+	 */
+	public static async triggerForceSync(
+		id: string,
+		actor: User,
+		actorIp: string
+	): Promise<{ alreadyRunning: boolean }> {
 		const source = await this.findById(id);
 		logger.info({ ingestionSourceId: id }, 'Force syncing started.');
 		if (!source) {
@@ -1011,6 +1019,11 @@ export class IngestionService {
 		// Clean up existing jobs for this source to break any stuck flows
 		const jobTypes: JobType[] = ['active', 'waiting', 'failed', 'delayed', 'paused'];
 		const jobs = await ingestionQueue.getJobs(jobTypes);
+		// BullMQ refuses to remove a job a worker holds, and the worker carries on with it. The cycle
+		// queued below then started a second sync of the same mailbox beside it, which races the
+		// dedup in processEmail; in one deployment both ran for ten hours and wedged the ingestion
+		// worker. A running sync is therefore left to finish, and this request starts nothing.
+		let stillRunning = false;
 		for (const job of jobs) {
 			if (job.data.ingestionSourceId === id) {
 				try {
@@ -1021,8 +1034,16 @@ export class IngestionService {
 					);
 				} catch (error) {
 					logger.error({ err: error, jobId: job.id }, 'Failed to remove stale job.');
+					stillRunning = true;
 				}
 			}
+		}
+		if (stillRunning) {
+			logger.warn(
+				{ ingestionSourceId: id },
+				'Force sync left alone: a sync of this source is still running'
+			);
+			return { alreadyRunning: true };
 		}
 
 		// Reset status to 'active'
@@ -1092,6 +1113,7 @@ export class IngestionService {
 				}
 			}
 		}
+		return { alreadyRunning: false };
 	}
 
 	public static async performBulkImport(

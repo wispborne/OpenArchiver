@@ -118,6 +118,7 @@
 			"bulk_actions": "Bulk Actions",
 			"force_sync": "Force Sync",
 			"force_sync_failed": "Could not start the sync",
+			"force_sync_already_running": "Already syncing",
 			"search_source": "Search this source",
 			"search_mailbox": "Search this mailbox's emails",
 			"reindex": "Reindex",

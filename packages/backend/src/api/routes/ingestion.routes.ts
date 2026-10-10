@@ -485,7 +485,7 @@ export const createIngestionRouter = (
 	 * /v1/ingestion-sources/{id}/sync:
 	 *   post:
 	 *     summary: Force sync
-	 *     description: Triggers an out-of-schedule continuous sync for the ingestion source. Requires `sync:ingestion` permission.
+	 *     description: Triggers an out-of-schedule continuous sync for the ingestion source. If a sync of the source is still running, nothing new is started and `alreadyRunning` is true, because a second sync of the same mailbox would run beside the first. Requires `sync:ingestion` permission.
 	 *     operationId: triggerForceSync
 	 *     tags:
 	 *       - Ingestion
@@ -501,11 +501,17 @@ export const createIngestionRouter = (
 	 *           example: "clx1y2z3a0000b4d2"
 	 *     responses:
 	 *       '202':
-	 *         description: Force sync job accepted and queued.
+	 *         description: Force sync job accepted and queued, or a sync was already running.
 	 *         content:
 	 *           application/json:
 	 *             schema:
-	 *               $ref: '#/components/schemas/MessageResponse'
+	 *               type: object
+	 *               properties:
+	 *                 message:
+	 *                   type: string
+	 *                 alreadyRunning:
+	 *                   type: boolean
+	 *                   description: True when a sync of the source was still running, so nothing new was started.
 	 *       '401':
 	 *         $ref: '#/components/responses/Unauthorized'
 	 *       '404':
