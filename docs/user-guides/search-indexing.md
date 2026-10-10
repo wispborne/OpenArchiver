@@ -12,11 +12,11 @@ This guide explains how indexing stays reliable, how to see index coverage, and 
 
 ## Index health
 
-Every ingestion source shows an **index-health** figure — "_X of Y emails indexed_" — comparing the number of archived emails (database) against the number of documents in the search index (Meilisearch). You can see it:
+Every ingestion source shows an **index-health** figure — "_X of Y emails indexed_" — comparing the number of archived emails against how many of them are marked as indexed. An email is marked indexed only after Meilisearch confirms the write, but the mark lives in the database: if a document disappears from Meilisearch later, the per-source figure does not notice. You can see it:
 
 - On the **Ingestion Sources** list (in the status hover card).
-- On a source's **Statistics** page (see below), as an index-coverage bar.
-- Globally on the dashboard via the [index-health endpoint](/api/dashboard#get-index-health).
+- On a source's **Statistics** page (see below), as an index-coverage bar, with a **Reindex missing only** button whenever coverage is below 100%.
+- Globally via the [index-health endpoint](/api/dashboard#get-index-health). This one does count the documents actually in Meilisearch, so it is the figure that catches documents lost from the index; a full rebuild repairs those.
 
 A gap between the two numbers means some emails are missing from search and should be reindexed.
 

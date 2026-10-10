@@ -70,7 +70,7 @@ Enqueues a reindex across every ingestion source. Requires `manage:ingestion`.
 
 ## Get Index Health
 
-Compares the number of archived emails in the database against the number of documents in the search index for a source (and its merge group). A gap means some emails are missing from search and can be repaired with a reindex.
+Compares the number of archived emails of a source (and its merge group) against how many of them are marked as indexed. Emails are marked only after Meilisearch confirms the write, but the count is taken from the database, not from Meilisearch. A gap means some emails are missing from search and can be repaired with a reindex.
 
 <OAOperation operationId="getIngestionSourceIndexHealth" />
 
@@ -95,6 +95,30 @@ Removes the alias and queues a job that moves the emails that came from the mail
 ## List Merged Mailboxes
 
 <OAOperation operationId="listMailboxAliases" />
+
+## Count Duplicate Emails
+
+Counts extra copies of the same email in a source: rows of one mailbox sharing a `Message-ID` with an earlier row. For a source in a merge group, covers the whole group. `duplicates` is what a cleanup would remove; copies it would keep are reported apart, as `protected` (legal hold, retention label or journaling) and `contentDiffers`. `deletionEnabled` and `running` say whether a cleanup can delete anything and whether one is in progress. See [Removing Duplicate Emails](../user-guides/removing-duplicates.md).
+
+<OAOperation operationId="countDuplicateEmails" />
+
+## Remove Duplicate Emails
+
+Queues a cleanup of the source's (or merge group's) extra copies and returns `202`. Refused with `403` when deletion is disabled for the instance, and with `409` (`reason: merge_running`) while a mailbox merge or unmerge is running. One cleanup runs at a time; `alreadyRunning: true` means this request joined one in progress.
+
+<OAOperation operationId="cleanupDuplicateEmails" />
+
+## Count Duplicate Emails Across the Archive
+
+The same count over every ingestion source. Requires `manage:ingestion`.
+
+<OAOperation operationId="countAllDuplicateEmails" />
+
+## Remove Duplicate Emails Across the Archive
+
+The same cleanup over every ingestion source. Requires `manage:ingestion`.
+
+<OAOperation operationId="cleanupAllDuplicateEmails" />
 
 ## Get Statistics
 

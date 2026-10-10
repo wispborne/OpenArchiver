@@ -41,8 +41,8 @@
 	const fmtDate = (d: string | null) =>
 		d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
 
-	// Index coverage percentage, clamped to 100 (Meilisearch count can momentarily
-	// exceed the DB count).
+	// Index coverage percentage. Both counts come from the database (`indexedCount` is the
+	// `is_indexed` flag, not a Meilisearch count), so the clamp to 100 is only a guard.
 	let coverage = $derived(
 		stats.totalEmails > 0 ? Math.min(100, Math.round((stats.indexedCount / stats.totalEmails) * 100)) : 0
 	);

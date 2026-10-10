@@ -308,7 +308,11 @@ export interface IngestionStats {
 	attachmentCount: number;
 	/** Emails that have at least one attachment. */
 	emailsWithAttachments: number;
-	/** Documents present in the search index (Meilisearch) for this group. */
+	/**
+	 * Emails of this group flagged `is_indexed` in the database. The flag is set only once
+	 * Meilisearch has confirmed the write, but this is a database count: it is not read from the
+	 * search index, so a document removed from Meilisearch behind the database's back still counts.
+	 */
 	indexedCount: number;
 	/** Emails flagged as journaled. */
 	journaledCount: number;

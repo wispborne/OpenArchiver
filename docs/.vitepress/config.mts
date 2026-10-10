@@ -38,6 +38,7 @@ export default defineConfig({
 					{ text: 'Email Integrity Check', link: '/user-guides/integrity-check' },
 					{ text: 'Searching the Archive', link: '/user-guides/searching' },
 					{ text: 'Search Indexing & Reindexing', link: '/user-guides/search-indexing' },
+					{ text: 'Removing Duplicate Emails', link: '/user-guides/removing-duplicates' },
 					{
 						text: 'Email Providers',
 						link: '/user-guides/email-providers/',

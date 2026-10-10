@@ -38,7 +38,7 @@ When both mailboxes received the same message, the target ends up with two copie
 - never removes a copy whose stored content differs from the copy being kept
 - writes an audit log entry for every copy it removes
 
-Leave the option off to keep both copies.
+Leave the option off to keep both copies. You can still remove them later with [Remove duplicate emails](../removing-duplicates.md).
 
 ## Unmerging a mailbox
 
