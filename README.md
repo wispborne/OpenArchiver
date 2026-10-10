@@ -3,7 +3,48 @@
 
 ## About this fork
 
-**Image:** `ghcr.io/wispborne/open-archiver`, rebuilt on every push to `main` that changes code. Tags: `latest`, `main`, and the first 12 characters of the commit SHA. To run it, use upstream's `docker-compose.yml` with the `open-archiver` service's `image:` changed to this one. Pin a SHA tag if you want to choose when you update.
+**Image:** `ghcr.io/wispborne/open-archiver`, rebuilt on every push to `main` that changes code. Tags: `latest`, `main`, and the first 12 characters of the commit SHA. Pin a SHA tag if you want to choose when you update.
+
+### Installing
+
+The fork runs with the same `docker-compose.yml` as upstream; only the app image differs. A `docker-compose.override.yml` swaps it without editing upstream's file.
+
+1. Clone the fork and create your `.env`:
+
+    ```bash
+    git clone https://github.com/wispborne/OpenArchiver.git
+    cd OpenArchiver
+    cp .env.example .env
+    ```
+
+2. Edit `.env`. At minimum:
+    - set `APP_URL` (and `ORIGIN`) to the address you will open in the browser
+    - change `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `MEILI_MASTER_KEY` and `JWT_SECRET`
+    - set `ENCRYPTION_KEY` to the output of `openssl rand -hex 32`
+
+    `.env.example` explains the rest.
+
+3. Point the app service at the fork's image:
+
+    ```bash
+    cat > docker-compose.override.yml <<'EOF'
+    services:
+        open-archiver:
+            image: ghcr.io/wispborne/open-archiver:latest
+    EOF
+    ```
+
+    Replace `latest` with a SHA tag to pin a version.
+
+4. Start it, then open `APP_URL` (by default `http://localhost:3000`) and create the first admin account:
+
+    ```bash
+    docker compose up -d
+    ```
+
+To update: `docker compose pull open-archiver && docker compose up -d`.
+
+**Switching an existing upstream install:** do step 3 in the folder that holds your `docker-compose.yml`, then `docker compose pull open-archiver && docker compose up -d`. Your data, `.env` and volumes stay as they are; the fork's migration runs on start. Back up the Postgres volume first, since going back to upstream's image afterwards is untested (see below).
 
 **Compatibility:**
 
