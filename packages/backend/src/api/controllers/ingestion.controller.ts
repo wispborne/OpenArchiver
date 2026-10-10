@@ -611,6 +611,23 @@ export class IngestionController {
 		}
 	};
 
+	/**
+	 * The merge group's latest mailbox merge or unmerge, running or finished, for the source page
+	 * to show while it polls. Answers `null` when the group has none on record.
+	 */
+	public getMailboxMergeStatus = async (req: Request, res: Response): Promise<Response> => {
+		try {
+			return res.status(200).json(await MailboxMergeService.getStatus(req.params.id));
+		} catch (error) {
+			return this.mailboxMergeErrorResponse(
+				req,
+				res,
+				error,
+				'Get mailbox merge status error'
+			);
+		}
+	};
+
 	private mailboxMergeErrorResponse(
 		req: Request,
 		res: Response,

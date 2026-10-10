@@ -852,6 +852,101 @@ export const createIngestionRouter = (
 
 	/**
 	 * @openapi
+	 * /v1/ingestion-sources/{id}/mailboxes/merge-status:
+	 *   get:
+	 *     summary: Get mailbox merge progress
+	 *     description: Reports the latest mailbox merge or unmerge of the source's merge group. While one is queued or running, `progress` says how many emails have moved and which phase it is in. Once it has finished, `result` (or `error`) says how it ended; that outcome stays readable for 30 days or until the group's next merge. `state` is `interrupted` when the job stopped without finishing, such as when its worker was killed; requesting the same merge or unmerge again finishes it. Answers `null` when the group has no merge on record. Requires `read:ingestion` permission.
+	 *     operationId: getMailboxMergeStatus
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *     responses:
+	 *       '200':
+	 *         description: The latest merge or unmerge, or `null`.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               nullable: true
+	 *               properties:
+	 *                 kind:
+	 *                   type: string
+	 *                   enum: [merge, unmerge]
+	 *                 state:
+	 *                   type: string
+	 *                   enum: [queued, running, completed, failed, interrupted]
+	 *                 mailbox:
+	 *                   type: string
+	 *                   description: The mailbox merged away, or for an unmerge, the mailbox being restored.
+	 *                 into:
+	 *                   type: string
+	 *                   nullable: true
+	 *                 collapseDuplicates:
+	 *                   type: boolean
+	 *                 progress:
+	 *                   type: object
+	 *                   nullable: true
+	 *                   properties:
+	 *                     phase:
+	 *                       type: string
+	 *                       enum: [moving, settling, final_pass, removing_duplicates]
+	 *                     moved:
+	 *                       type: integer
+	 *                     total:
+	 *                       type: integer
+	 *                       description: Emails there were to move. Syncs can add more while it runs.
+	 *                     settleUntil:
+	 *                       type: string
+	 *                       format: date-time
+	 *                       description: When the wait for running syncs ends. Only in the `settling` phase.
+	 *                 result:
+	 *                   type: object
+	 *                   nullable: true
+	 *                   properties:
+	 *                     moved:
+	 *                       type: integer
+	 *                     duplicatesRemoved:
+	 *                       type: integer
+	 *                     duplicatesKept:
+	 *                       type: integer
+	 *                 error:
+	 *                   type: string
+	 *                   nullable: true
+	 *                 queuedAt:
+	 *                   type: string
+	 *                   format: date-time
+	 *                   nullable: true
+	 *                 startedAt:
+	 *                   type: string
+	 *                   format: date-time
+	 *                   nullable: true
+	 *                 finishedAt:
+	 *                   type: string
+	 *                   format: date-time
+	 *                   nullable: true
+	 *                 workerAlive:
+	 *                   type: boolean
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 */
+	router.get(
+		'/:id/mailboxes/merge-status',
+		requirePermission('read', 'ingestion', { loadResource: ingestionResource }),
+		ingestionController.getMailboxMergeStatus
+	);
+
+	/**
+	 * @openapi
 	 * /v1/ingestion-sources/{id}/duplicates:
 	 *   get:
 	 *     summary: Count duplicate emails in a source

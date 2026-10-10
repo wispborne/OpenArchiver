@@ -92,6 +92,10 @@ Removes the alias and queues a job that moves the emails that came from the mail
 
 <OAOperation operationId="unmergeMailbox" />
 
+## Get Mailbox Merge Progress
+
+<OAOperation operationId="getMailboxMergeStatus" />
+
 ## List Merged Mailboxes
 
 <OAOperation operationId="listMailboxAliases" />

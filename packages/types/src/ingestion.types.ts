@@ -476,6 +476,58 @@ export interface IUnmergeMailboxJob {
 	actorIp: string;
 }
 
+/**
+ * Where a running mailbox merge or unmerge has got to. Reported by the job as BullMQ progress.
+ *
+ * - `moving`: the first pass, moving rows in batches
+ * - `settling`: waiting until `settleUntil` for running syncs to pick up the new aliases
+ * - `final_pass`: moving the rows those syncs wrote in the meantime
+ * - `removing_duplicates`: a merge with `collapseDuplicates`, after the rows have moved
+ */
+export interface MailboxMergeProgress {
+	phase: 'moving' | 'settling' | 'final_pass' | 'removing_duplicates';
+	/** Rows moved so far. */
+	moved: number;
+	/** Rows there were to move when the job started. Syncs can add more, so `moved` may pass it. */
+	total: number;
+	/** ISO time the settle wait ends; present only in the `settling` phase. */
+	settleUntil?: string;
+	/**
+	 * ISO time of this report. Batches report every few seconds, so a report long overdue means the
+	 * worker has probably stopped. Set by the job processor.
+	 */
+	reportedAt?: string;
+}
+
+/**
+ * The latest mailbox merge or unmerge of a merge group: the one in progress, or else the last one
+ * that finished. Returned by `GET /v1/ingestion-sources/{id}/mailboxes/merge-status`.
+ */
+export interface MailboxMergeStatus {
+	kind: 'merge' | 'unmerge';
+	/**
+	 * `interrupted` means the job stopped without finishing or failing cleanly, such as when its
+	 * worker was killed. Requesting the same merge or unmerge again finishes it.
+	 */
+	state: 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
+	/** The mailbox merged away, or for an unmerge, the mailbox being restored. */
+	mailbox: string;
+	/** The mailbox merged into. Null for an unmerge. */
+	into: string | null;
+	collapseDuplicates: boolean;
+	/** Present while running. */
+	progress: MailboxMergeProgress | null;
+	/** Present once completed. `duplicatesRemoved` and `duplicatesKept` are zero for an unmerge. */
+	result: IMergeMailboxesResult | null;
+	/** The job's error, when failed. */
+	error: string | null;
+	queuedAt: string | null;
+	startedAt: string | null;
+	finishedAt: string | null;
+	/** Whether an indexing worker is running. A queued job without one will not start. */
+	workerAlive: boolean;
+}
+
 /** What a completed mailbox merge did. Logged by the job and returned as its result. */
 export interface IMergeMailboxesResult {
 	moved: number;

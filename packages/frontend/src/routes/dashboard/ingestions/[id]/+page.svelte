@@ -29,6 +29,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import MailboxMergeDialog from '$lib/components/custom/MailboxMergeDialog.svelte';
 	import DuplicateCleanupDialog from '$lib/components/custom/DuplicateCleanupDialog.svelte';
+	import MailboxMergeProgress from '$lib/components/custom/MailboxMergeProgress.svelte';
 	import { setAlert } from '$lib/components/custom/alert/alert-state.svelte';
 	import { api } from '$lib/api.client';
 	import { invalidateAll } from '$app/navigation';
@@ -219,6 +220,12 @@
 				</DropdownMenu.Root>
 			</div>
 		</div>
+
+		<MailboxMergeProgress
+			sourceId={stats.sourceId}
+			status={data.mergeStatus}
+			onFinished={() => invalidateAll()}
+		/>
 
 		<!-- Summary stat cards -->
 		<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

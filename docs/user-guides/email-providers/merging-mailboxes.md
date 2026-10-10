@@ -26,6 +26,14 @@ Aliases are kept flat. If A was merged into B and B is later merged into C, A th
 
 The emails are moved by the indexing worker in the background. Each moved email is also re-indexed so that search filters on the new mailbox. The job waits about a minute before its last pass, so a sync that was already running when you merged has switched to the new mailbox before the job finishes.
 
+## Following a merge
+
+While a merge or unmerge runs, the source's statistics page shows it at the top: how many emails have moved, and which step it is on. The page updates by itself. When the job finishes, the same place says how many emails moved and how many duplicate copies were removed; dismiss the message once you have read it. The outcome stays available for 30 days, or until the next merge of the same source.
+
+If the job fails, the message shows the error and a **Retry** button. Retrying is safe: emails that already moved stay where they are, and the job moves the rest. If the indexing worker stops partway, the page warns after a minute without progress. Once a worker is running again it restarts the job, which can take up to ten minutes after the crash.
+
+The job is also listed under **Admin → Jobs**, in the indexing queue, with its log.
+
 A merge can't start while a sync of the source is running, or while another mailbox merge or unmerge of the same source is still in progress.
 
 ## Duplicate copies
