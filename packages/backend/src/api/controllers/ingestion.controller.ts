@@ -8,10 +8,18 @@ import {
 	SafeIngestionSource,
 } from '@open-archiver/types';
 import { logger } from '../../config/logger';
+import { config } from '../../config';
+import { indexingQueue } from '../../jobs/queues';
+import { isJobLive } from '../../jobs/helpers/claimJobId';
 import { UserService } from '../../services/UserService';
 import { AuditService } from '../../services/AuditService';
 import { checkDeletionEnabled } from '../../helpers/deletionGuard';
-import type { MailboxMergeDispatch, MergeMailboxesDto, ReindexMode } from '@open-archiver/types';
+import type {
+	IDuplicateCountResponse,
+	MailboxMergeDispatch,
+	MergeMailboxesDto,
+	ReindexMode,
+} from '@open-archiver/types';
 import { MailboxMergeError, MailboxMergeService } from '../../services/MailboxMergeService';
 import { AuthorizationService } from '../../services/AuthorizationService';
 
@@ -38,14 +46,15 @@ export class IngestionController {
 	/**
 	 * Whether the duplicate-email endpoints answer at all.
 	 *
-	 * Off while the feature is held back from release. The routes stay registered and the service,
-	 * job and sweep below are untouched, so re-enabling is this one flag — and a withheld endpoint
-	 * answers with a reason rather than a 404, which would suggest the caller had the URL wrong.
+	 * Upstream ships this off while the feature is held back from release; this fork turns it on
+	 * and offers the per-source sweep in the UI. Kept as a flag, rather than removed, so an upstream
+	 * merge touching it stays a one-line conflict. When off, a withheld endpoint answers with a
+	 * reason rather than a 404, which would suggest the caller had the URL wrong.
 	 *
 	 * Typed `boolean` rather than left to infer `false`, so the code guarded by it is not narrowed
 	 * to unreachable.
 	 */
-	private static readonly DUPLICATE_CLEANUP_ENABLED: boolean = false;
+	private static readonly DUPLICATE_CLEANUP_ENABLED: boolean = true;
 
 	private userService = new UserService();
 	private auditService = new AuditService();
@@ -367,13 +376,38 @@ export class IngestionController {
 				.json({ message: req.t('ingestion.duplicateCleanupUnavailable') });
 		}
 		try {
-			const counts = await ArchiveMaintenanceService.countDuplicates(req.params.id);
-			return res.status(200).json(counts);
+			const scope = await this.duplicateScope(req.params.id);
+			const [counts, running] = await Promise.all([
+				ArchiveMaintenanceService.countDuplicates(scope),
+				ArchiveMaintenanceService.isCleanupRunning(),
+			]);
+			const body: IDuplicateCountResponse = {
+				...counts,
+				deletionEnabled: config.app.enableDeletion,
+				running,
+			};
+			return res.status(200).json(body);
 		} catch (error) {
+			if (error instanceof Error && error.message === 'Ingestion source not found') {
+				return res.status(404).json({ message: req.t('ingestion.notFound') });
+			}
 			logger.error({ err: error, id: req.params.id }, 'Get duplicate count error');
 			return res.status(500).json({ message: req.t('errors.internalServerError') });
 		}
 	};
+
+	/**
+	 * The source a duplicate sweep runs over: the merge group's root, or every source when no id
+	 * was given (the global routes).
+	 *
+	 * A merge child's archived rows carry its root's id (see `effectiveSource` in
+	 * IngestionService), so sweeping under the child's own id would find nothing and report the
+	 * group as clean. Opening the dialog from a child's page therefore covers the whole group, which
+	 * is also what that page's stats describe.
+	 */
+	private async duplicateScope(id: string | undefined): Promise<string | undefined> {
+		return id ? MailboxMergeService.resolveRootId(id) : undefined;
+	}
 
 	/**
 	 * Queues a sweep that removes surplus copies of the same message.
@@ -412,7 +446,21 @@ export class IngestionController {
 				return res.status(401).json({ message: req.t('errors.unauthorized') });
 			}
 
-			const ingestionSourceId = req.params.id;
+			const ingestionSourceId = await this.duplicateScope(req.params.id);
+
+			// A mailbox merge or unmerge rewrites which mailbox rows belong to, and the sweep groups
+			// on the mailbox. Running both at once would rank copies against a grouping that is
+			// still moving, so the sweep waits until the merge has finished.
+			if (
+				ingestionSourceId &&
+				(await isJobLive(indexingQueue, MailboxMergeService.jobIdFor(ingestionSourceId)))
+			) {
+				return res.status(409).json({
+					message: req.t('ingestion.duplicateCleanupMergeRunning'),
+					reason: 'merge_running',
+				});
+			}
+
 			const dispatch = await ArchiveMaintenanceService.triggerCleanupDuplicates(
 				actor,
 				req.ip || 'unknown',
@@ -440,6 +488,9 @@ export class IngestionController {
 				...dispatch,
 			});
 		} catch (error) {
+			if (error instanceof Error && error.message === 'Ingestion source not found') {
+				return res.status(404).json({ message: req.t('ingestion.notFound') });
+			}
 			logger.error({ err: error, id: req.params.id }, 'Trigger duplicate cleanup error');
 			return res.status(500).json({ message: req.t('errors.internalServerError') });
 		}

@@ -56,6 +56,7 @@
 		"duplicateCleanupTriggered": "Duplicate cleanup started. It runs in the background.",
 		"duplicateCleanupUnavailable": "Duplicate email cleanup is not available in this version.",
 		"deletionDisabled": "Deletion is disabled for this instance. Set ENABLE_DELETION=true to remove duplicate emails.",
+		"duplicateCleanupMergeRunning": "A mailbox merge is running on this source. Wait for it to finish, then remove duplicates.",
 		"journalingSourceManagedByJournaling": "SMTP journaling sources are managed through the Journaling page and cannot be modified via the ingestion source API.",
 		"oauthNotOAuthSource": "This ingestion source does not use OAuth authorization.",
 		"oauthAuthorizeFailed": "Could not start the mailbox authorization.",

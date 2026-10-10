@@ -2532,6 +2532,56 @@
         }
       }
     },
+    "/v1/ingestion-sources/duplicates/cleanup": {
+      "post": {
+        "summary": "Remove duplicate emails across the archive",
+        "description": "Removes extra copies of the same email in the background. One copy of every message is kept, a copy is removed only when its stored content is identical to the kept one, and copies under legal hold, a retention label, or journaling are never removed. Needs deletion enabled (ENABLE_DELETION). One cleanup runs at a time; a request made while one is running joins it. Covers every ingestion source. Requires `manage:ingestion` permission.",
+        "operationId": "cleanupAllDuplicateEmails",
+        "tags": [
+          "Ingestion"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cleanup queued, or joined a cleanup already running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "duplicatesFound": {
+                      "type": "integer"
+                    },
+                    "workerAlive": {
+                      "type": "boolean"
+                    },
+                    "alreadyRunning": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Deletion is disabled for this instance, or the caller lacks permission."
+          }
+        }
+      }
+    },
     "/v1/ingestion-sources/{id}": {
       "get": {
         "summary": "Get an ingestion source",
@@ -3392,6 +3442,72 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/ingestion-sources/{id}/duplicates/cleanup": {
+      "post": {
+        "summary": "Remove duplicate emails from a source",
+        "description": "Removes extra copies of the same email in the background. One copy of every message is kept, a copy is removed only when its stored content is identical to the kept one, and copies under legal hold, a retention label, or journaling are never removed. Needs deletion enabled (ENABLE_DELETION). One cleanup runs at a time; a request made while one is running joins it. For a source in a merge group, covers the whole group. Requires `delete:ingestion` permission.",
+        "operationId": "cleanupDuplicateEmails",
+        "tags": [
+          "Ingestion"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cleanup queued, or joined a cleanup already running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "duplicatesFound": {
+                      "type": "integer"
+                    },
+                    "workerAlive": {
+                      "type": "boolean"
+                    },
+                    "alreadyRunning": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Deletion is disabled for this instance, or the caller lacks permission."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "A mailbox merge or unmerge is running on this source (`reason` is `merge_running`)."
           }
         }
       }

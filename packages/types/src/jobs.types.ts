@@ -117,8 +117,9 @@ export interface ICleanupDuplicatesJob {
 export interface ICleanupDuplicatesDispatch {
 	/**
 	 * Surplus rows the sweep would remove, from the pre-count. Copies protected by a legal hold, a
-	 * retention label, or journaling are already excluded. Still an upper bound, because a copy
-	 * whose content differs from the one being kept is only detected during the sweep itself.
+	 * retention label, or journaling, and copies whose content differs from the one being kept, are
+	 * already excluded. Still an upper bound: a deletion can fail, and syncs can change the rows
+	 * before the sweep reaches them.
 	 */
 	duplicatesFound: number;
 	/** Whether an indexing worker has reported a heartbeat recently enough to be doing the work. */
@@ -138,7 +139,10 @@ export interface ICleanupDuplicatesResponse extends ICleanupDuplicatesDispatch {
 
 /** Body returned by both duplicate-count endpoints. */
 export interface IDuplicateCountResponse {
-	/** Surplus rows a sweep would actually remove — protected copies are already excluded. */
+	/**
+	 * Surplus rows a sweep would actually remove. Protected copies, and copies whose content
+	 * differs from the one kept, are already excluded.
+	 */
 	duplicates: number;
 	/** How many distinct messages those removable copies belong to. */
 	groups: number;
@@ -148,6 +152,21 @@ export interface IDuplicateCountResponse {
 	 * policy will then decline to act on.
 	 */
 	protected: number;
+	/**
+	 * Surplus copies a sweep will leave in place because their stored content differs from the copy
+	 * being kept: the same Message-ID, but not the same email.
+	 */
+	contentDiffers?: number;
+	/**
+	 * Whether a sweep can delete anything in this deployment (`ENABLE_DELETION`). Lets a client say
+	 * so before the user confirms, rather than after the cleanup request is refused.
+	 */
+	deletionEnabled?: boolean;
+	/**
+	 * Whether a sweep is queued or running right now, whatever its scope. One runs at a time, so a
+	 * request made meanwhile joins it, and the counts above are still shrinking.
+	 */
+	running?: boolean;
 }
 
 /** What a completed duplicate sweep did. Logged by the job and returned as its result. */

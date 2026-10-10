@@ -19,9 +19,11 @@
 		Lock,
 		Database,
 		Merge,
+		CopyMinus,
 	} from 'lucide-svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import MailboxMergeDialog from '$lib/components/custom/MailboxMergeDialog.svelte';
+	import DuplicateCleanupDialog from '$lib/components/custom/DuplicateCleanupDialog.svelte';
 	import { setAlert } from '$lib/components/custom/alert/alert-state.svelte';
 	import { api } from '$lib/api.client';
 	import { invalidateAll } from '$app/navigation';
@@ -51,6 +53,8 @@
 			return acc;
 		}, {} as Record<string, string[]>)
 	);
+
+	let isDedupeDialogOpen = $state(false);
 
 	let isMergeDialogOpen = $state(false);
 	let mergeFrom = $state('');
@@ -128,13 +132,19 @@
 					{stats.provider.split('_').join(' ')}
 				</p>
 			</div>
-			<Button
-				variant="outline"
-				href="/dashboard/archived-emails?ingestionSourceId={stats.sourceId}"
-			>
-				<Mail class="mr-2 h-4 w-4" />
-				{$t('app.ingestions.view_emails')}
-			</Button>
+			<div class="flex flex-wrap gap-2">
+				<Button
+					variant="outline"
+					href="/dashboard/archived-emails?ingestionSourceId={stats.sourceId}"
+				>
+					<Mail class="mr-2 h-4 w-4" />
+					{$t('app.ingestions.view_emails')}
+				</Button>
+				<Button variant="outline" onclick={() => (isDedupeDialogOpen = true)}>
+					<CopyMinus class="mr-2 h-4 w-4" />
+					{$t('app.ingestions.remove_duplicates')}
+				</Button>
+			</div>
 		</div>
 
 		<!-- Summary stat cards -->
@@ -367,6 +377,14 @@
 			</Card.Root>
 		{/if}
 	</div>
+
+	<DuplicateCleanupDialog
+		bind:open={isDedupeDialogOpen}
+		sourceId={stats.sourceId}
+		sourceName={stats.name}
+		inMergeGroup={stats.children.length > 0 || !!data.source?.mergedIntoId}
+		onQueued={() => invalidateAll()}
+	/>
 
 	<MailboxMergeDialog
 		bind:open={isMergeDialogOpen}

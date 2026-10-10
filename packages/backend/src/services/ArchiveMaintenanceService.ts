@@ -15,7 +15,7 @@ import {
 } from '../database/schema';
 import { ArchivedEmailService } from './ArchivedEmailService';
 import { indexingQueue } from '../jobs/queues';
-import { claimJobId } from '../jobs/helpers/claimJobId';
+import { claimJobId, isJobLive } from '../jobs/helpers/claimJobId';
 import { isIndexingWorkerAlive } from '../jobs/helpers/workerLiveness';
 import { logger } from '../config/logger';
 
@@ -151,19 +151,24 @@ export class ArchiveMaintenanceService {
 	 * How many surplus rows a sweep would remove, and how many it would refuse on policy grounds.
 	 *
 	 * `duplicates` excludes protected copies, so the confirmation never quotes a figure that policy
-	 * will then decline to act on. It remains an upper bound for one reason only: a copy whose
-	 * content differs from the row being kept is detected during the sweep, not here.
+	 * will then decline to act on. It also excludes copies whose content differs from the row being
+	 * kept, using the same comparison the sweep makes (`is not distinct from` matches the sweep's
+	 * `!==`, null included). Without that, a source whose only remaining surplus is such a copy
+	 * would offer a cleanup forever, and every run would remove nothing. It is still an upper
+	 * bound: a deletion can fail, and syncs can change the rows between count and sweep.
 	 */
 	public static async countDuplicates(
 		ingestionSourceId?: string,
 		normalizedMailbox?: string
 	): Promise<IDuplicateCountResponse> {
 		const ranked = this.#rankedDuplicates(ingestionSourceId, normalizedMailbox);
+		const sameContent = sql`(${ranked.hash} is not distinct from ${ranked.keptHash})`;
 		const [row] = await db
 			.select({
-				duplicates: sql<number>`count(*) filter (where not ${ranked.isProtected})::int`,
-				groups: sql<number>`count(distinct ${ranked.groupKey}) filter (where not ${ranked.isProtected})::int`,
+				duplicates: sql<number>`count(*) filter (where not ${ranked.isProtected} and ${sameContent})::int`,
+				groups: sql<number>`count(distinct ${ranked.groupKey}) filter (where not ${ranked.isProtected} and ${sameContent})::int`,
 				protected: sql<number>`count(*) filter (where ${ranked.isProtected})::int`,
+				contentDiffers: sql<number>`count(*) filter (where not ${ranked.isProtected} and not ${sameContent})::int`,
 			})
 			.from(ranked)
 			.where(sql`${ranked.rank} > 1`);
@@ -172,7 +177,13 @@ export class ArchiveMaintenanceService {
 			duplicates: row?.duplicates ?? 0,
 			groups: row?.groups ?? 0,
 			protected: row?.protected ?? 0,
+			contentDiffers: row?.contentDiffers ?? 0,
 		};
+	}
+
+	/** Whether a sweep, of any scope, is queued or running. Read-only: see {@link isJobLive}. */
+	public static isCleanupRunning(): Promise<boolean> {
+		return isJobLive(indexingQueue, CLEANUP_JOB_ID);
 	}
 
 	/**

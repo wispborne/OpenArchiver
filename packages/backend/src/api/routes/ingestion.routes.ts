@@ -109,15 +109,86 @@ export const createIngestionRouter = (
 		ingestionController.reindexAll
 	);
 
-	// Withheld from the API reference while the feature is held back: the endpoints answer 503
-	// (see IngestionController.DUPLICATE_CLEANUP_ENABLED). The @openapi blocks were removed so
-	// the generated spec does not advertise them; restore them when the feature ships.
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/duplicates:
+	 *   get:
+	 *     summary: Count duplicate emails across the archive
+	 *     description: Counts extra copies of the same email: rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. Covers every ingestion source. Requires `manage:ingestion` permission.
+	 *     operationId: countAllDuplicateEmails
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     responses:
+	 *       '200':
+	 *         description: Duplicate counts.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 duplicates:
+	 *                   type: integer
+	 *                   description: Extra copies a cleanup would remove. Protected copies and copies whose content differs from the one kept are excluded.
+	 *                 groups:
+	 *                   type: integer
+	 *                   description: Distinct messages those copies belong to.
+	 *                 protected:
+	 *                   type: integer
+	 *                   description: Extra copies a cleanup will leave in place because of a legal hold, a retention label, or journaling.
+	 *                 contentDiffers:
+	 *                   type: integer
+	 *                   description: Extra copies a cleanup will leave in place because their stored content differs from the copy kept.
+	 *                 deletionEnabled:
+	 *                   type: boolean
+	 *                   description: Whether deletion is enabled for this instance (ENABLE_DELETION). Without it a cleanup is refused.
+	 *                 running:
+	 *                   type: boolean
+	 *                   description: Whether a duplicate cleanup of any scope is queued or running.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 */
 	router.get(
 		'/duplicates',
 		requirePermission('manage', 'ingestion'),
 		ingestionController.getDuplicateCount
 	);
 
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/duplicates/cleanup:
+	 *   post:
+	 *     summary: Remove duplicate emails across the archive
+	 *     description: Removes extra copies of the same email in the background. One copy of every message is kept, a copy is removed only when its stored content is identical to the kept one, and copies under legal hold, a retention label, or journaling are never removed. Needs deletion enabled (ENABLE_DELETION). One cleanup runs at a time; a request made while one is running joins it. Covers every ingestion source. Requires `manage:ingestion` permission.
+	 *     operationId: cleanupAllDuplicateEmails
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     responses:
+	 *       '202':
+	 *         description: Cleanup queued, or joined a cleanup already running.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 message:
+	 *                   type: string
+	 *                 duplicatesFound:
+	 *                   type: integer
+	 *                 workerAlive:
+	 *                   type: boolean
+	 *                 alreadyRunning:
+	 *                   type: boolean
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '403':
+	 *         description: Deletion is disabled for this instance, or the caller lacks permission.
+	 */
 	router.post(
 		'/duplicates/cleanup',
 		requirePermission('manage', 'ingestion'),
@@ -779,15 +850,104 @@ export const createIngestionRouter = (
 		ingestionController.listMailboxAliases
 	);
 
-	// Withheld from the API reference while the feature is held back: the endpoints answer 503
-	// (see IngestionController.DUPLICATE_CLEANUP_ENABLED). The @openapi blocks were removed so
-	// the generated spec does not advertise them; restore them when the feature ships.
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/{id}/duplicates:
+	 *   get:
+	 *     summary: Count duplicate emails in a source
+	 *     description: Counts extra copies of the same email: rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. For a source in a merge group, covers the whole group. Requires `read:ingestion` permission.
+	 *     operationId: countDuplicateEmails
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *     responses:
+	 *       '200':
+	 *         description: Duplicate counts.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 duplicates:
+	 *                   type: integer
+	 *                   description: Extra copies a cleanup would remove. Protected copies and copies whose content differs from the one kept are excluded.
+	 *                 groups:
+	 *                   type: integer
+	 *                   description: Distinct messages those copies belong to.
+	 *                 protected:
+	 *                   type: integer
+	 *                   description: Extra copies a cleanup will leave in place because of a legal hold, a retention label, or journaling.
+	 *                 contentDiffers:
+	 *                   type: integer
+	 *                   description: Extra copies a cleanup will leave in place because their stored content differs from the copy kept.
+	 *                 deletionEnabled:
+	 *                   type: boolean
+	 *                   description: Whether deletion is enabled for this instance (ENABLE_DELETION). Without it a cleanup is refused.
+	 *                 running:
+	 *                   type: boolean
+	 *                   description: Whether a duplicate cleanup of any scope is queued or running.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 */
 	router.get(
 		'/:id/duplicates',
 		requirePermission('read', 'ingestion', { loadResource: ingestionResource }),
 		ingestionController.getDuplicateCount
 	);
 
+	/**
+	 * @openapi
+	 * /v1/ingestion-sources/{id}/duplicates/cleanup:
+	 *   post:
+	 *     summary: Remove duplicate emails from a source
+	 *     description: Removes extra copies of the same email in the background. One copy of every message is kept, a copy is removed only when its stored content is identical to the kept one, and copies under legal hold, a retention label, or journaling are never removed. Needs deletion enabled (ENABLE_DELETION). One cleanup runs at a time; a request made while one is running joins it. For a source in a merge group, covers the whole group. Requires `delete:ingestion` permission.
+	 *     operationId: cleanupDuplicateEmails
+	 *     tags:
+	 *       - Ingestion
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     parameters:
+	 *       - name: id
+	 *         in: path
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *     responses:
+	 *       '202':
+	 *         description: Cleanup queued, or joined a cleanup already running.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 message:
+	 *                   type: string
+	 *                 duplicatesFound:
+	 *                   type: integer
+	 *                 workerAlive:
+	 *                   type: boolean
+	 *                 alreadyRunning:
+	 *                   type: boolean
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '403':
+	 *         description: Deletion is disabled for this instance, or the caller lacks permission.
+	 *       '409':
+	 *         description: A mailbox merge or unmerge is running on this source (`reason` is `merge_running`).
+	 *       '404':
+	 *         $ref: '#/components/responses/NotFound'
+	 */
 	router.post(
 		'/:id/duplicates/cleanup',
 		requirePermission('delete', 'ingestion', { loadResource: ingestionResource }),

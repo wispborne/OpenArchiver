@@ -8,6 +8,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import IngestionSourceForm from '$lib/components/custom/IngestionSourceForm.svelte';
+	import DuplicateCleanupDialog from '$lib/components/custom/DuplicateCleanupDialog.svelte';
 	import OAuthDeviceCodeDialog from '$lib/components/custom/OAuthDeviceCodeDialog.svelte';
 	import { api } from '$lib/api.client';
 	import type {
@@ -30,6 +31,12 @@
 	let isDialogOpen = $state(false);
 	let isDeleteDialogOpen = $state(false);
 	let selectedSource = $state<SafeIngestionSource | null>(null);
+	let isDedupeDialogOpen = $state(false);
+	let dedupeSource = $state<SafeIngestionSource | null>(null);
+	const openDedupeDialog = (source: SafeIngestionSource) => {
+		dedupeSource = source;
+		isDedupeDialogOpen = true;
+	};
 	let sourceToDelete = $state<SafeIngestionSource | null>(null);
 	let isDeleting = $state(false);
 	let selectedIds = $state<string[]>([]);
@@ -853,6 +860,13 @@
 												>
 											</DropdownMenu.SubContent>
 										</DropdownMenu.Sub>
+										<!-- Root rows only: a child's archived mail is owned by
+										     its root, so the cleanup is offered once per group. -->
+										<DropdownMenu.Item onclick={() => openDedupeDialog(source)}
+											>{$t(
+												'app.ingestions.remove_duplicates'
+											)}</DropdownMenu.Item
+										>
 										<DropdownMenu.Separator />
 										<DropdownMenu.Item
 											class="text-red-600"
@@ -1003,6 +1017,15 @@
 		</Table.Root>
 	</div>
 </div>
+
+{#if dedupeSource}
+	<DuplicateCleanupDialog
+		bind:open={isDedupeDialogOpen}
+		sourceId={dedupeSource.id}
+		sourceName={dedupeSource.name}
+		inMergeGroup={getChildren(dedupeSource.id).length > 0}
+	/>
+{/if}
 
 <Dialog.Root bind:open={isDialogOpen}>
 	<Dialog.Content
