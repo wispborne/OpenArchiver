@@ -1,7 +1,7 @@
 name: ghcr
 
 # Builds the fork's image and publishes it to GitHub Container Registry on every push to main.
-# Tags: the first 12 characters of the commit SHA (what Zephyrus's update.sh pins) and `main`.
+# Tags: the first 12 characters of the commit SHA (what Zephyrus's update.sh pins), `main` and `latest`.
 # Lives in its own file so merges from upstream never conflict with it; upstream's
 # docker-deployment / release-tag workflows are disabled in this repo's Actions settings instead.
 
@@ -55,6 +55,7 @@ jobs:
                   tags: |
                       ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
                       ${{ steps.meta.outputs.image }}:main
+                      ${{ steps.meta.outputs.image }}:latest
                   labels: |
                       org.opencontainers.image.source=https://github.com/${{ github.repository }}
                       org.opencontainers.image.revision=${{ github.sha }}
