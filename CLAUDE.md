@@ -123,7 +123,7 @@ Known environment quirks:
 
 ## MCP server (planned)
 
-Not built yet. Intended shape, unless decided otherwise:
+Not built yet. The agreed plan and a handoff for whoever builds it are in `.claude/plans/mcp-server.md`. Intended shape, unless decided otherwise:
 
 - A new workspace package (for example `packages/mcp-server`) using the official TypeScript MCP SDK.
 - It talks to the REST API over HTTP with an API key (`X-API-KEY` header; keys are created in the UI or via `/v1/api-keys`), never directly to Postgres or Meilisearch. That keeps permissions, audit logging and IAM in one place, and it is why the API must stay stable.
