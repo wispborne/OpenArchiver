@@ -4,6 +4,34 @@
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--
+			Apply the dark theme before first paint. The layout's $effect does the same, but only
+			after hydration, so a dark-theme page first rendered white and then flipped. Keys and
+			resolution order mirror +layout.svelte: the user's choice ("theme", JSON-encoded by
+			svelte-persisted-store), then the instance default it caches in "theme-default", then
+			the OS preference. The inline background covers the gap before app.css arrives (in dev
+			Vite injects it from JS) and matches --background in .dark.
+		-->
+		<style>
+			html.dark {
+				background-color: oklch(0.141 0.005 285.823);
+				color-scheme: dark;
+			}
+		</style>
+		<script>
+			(function () {
+				try {
+					var theme = JSON.parse(localStorage.getItem('theme') || '"system"');
+					if (theme !== 'light' && theme !== 'dark') {
+						theme = localStorage.getItem('theme-default') || 'system';
+					}
+					var dark =
+						theme === 'dark' ||
+						(theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+					document.documentElement.classList.toggle('dark', dark);
+				} catch (e) {}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

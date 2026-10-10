@@ -21,6 +21,14 @@
 				finalTheme = data.systemSettings?.theme || 'system';
 			}
 
+			// Cache the instance default for the pre-paint script in app.html, which runs
+			// before any data is loaded and would otherwise not know it.
+			try {
+				localStorage.setItem('theme-default', data.systemSettings?.theme || 'system');
+			} catch {
+				// Storage blocked (private mode, policy): the script falls back to the OS setting.
+			}
+
 			const isDark =
 				finalTheme === 'dark' ||
 				(finalTheme === 'system' &&
