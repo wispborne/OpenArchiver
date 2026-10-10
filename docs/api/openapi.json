@@ -2565,6 +2565,65 @@
         }
       }
     },
+    "/v1/ingestion-sources/duplicates": {
+      "get": {
+        "summary": "Count duplicate emails across the archive",
+        "description": "Counts extra copies of the same email, meaning rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. Covers every ingestion source. Requires `manage:ingestion` permission.",
+        "operationId": "countAllDuplicateEmails",
+        "tags": [
+          "Ingestion"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Duplicate counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "duplicates": {
+                      "type": "integer",
+                      "description": "Extra copies a cleanup would remove. Protected copies and copies whose content differs from the one kept are excluded."
+                    },
+                    "groups": {
+                      "type": "integer",
+                      "description": "Distinct messages those copies belong to."
+                    },
+                    "protected": {
+                      "type": "integer",
+                      "description": "Extra copies a cleanup will leave in place because of a legal hold, a retention label, or journaling."
+                    },
+                    "contentDiffers": {
+                      "type": "integer",
+                      "description": "Extra copies a cleanup will leave in place because their stored content differs from the copy kept."
+                    },
+                    "deletionEnabled": {
+                      "type": "boolean",
+                      "description": "Whether deletion is enabled for this instance (ENABLE_DELETION). Without it a cleanup is refused."
+                    },
+                    "running": {
+                      "type": "boolean",
+                      "description": "Whether a duplicate cleanup of any scope is queued or running."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/v1/ingestion-sources/duplicates/cleanup": {
       "post": {
         "summary": "Remove duplicate emails across the archive",
@@ -3605,6 +3664,78 @@
                     },
                     "workerAlive": {
                       "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/ingestion-sources/{id}/duplicates": {
+      "get": {
+        "summary": "Count duplicate emails in a source",
+        "description": "Counts extra copies of the same email, meaning rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. For a source in a merge group, covers the whole group. Requires `read:ingestion` permission.",
+        "operationId": "countDuplicateEmails",
+        "tags": [
+          "Ingestion"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Duplicate counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "duplicates": {
+                      "type": "integer",
+                      "description": "Extra copies a cleanup would remove. Protected copies and copies whose content differs from the one kept are excluded."
+                    },
+                    "groups": {
+                      "type": "integer",
+                      "description": "Distinct messages those copies belong to."
+                    },
+                    "protected": {
+                      "type": "integer",
+                      "description": "Extra copies a cleanup will leave in place because of a legal hold, a retention label, or journaling."
+                    },
+                    "contentDiffers": {
+                      "type": "integer",
+                      "description": "Extra copies a cleanup will leave in place because their stored content differs from the copy kept."
+                    },
+                    "deletionEnabled": {
+                      "type": "boolean",
+                      "description": "Whether deletion is enabled for this instance (ENABLE_DELETION). Without it a cleanup is refused."
+                    },
+                    "running": {
+                      "type": "boolean",
+                      "description": "Whether a duplicate cleanup of any scope is queued or running."
                     }
                   }
                 }

@@ -114,7 +114,7 @@ export const createIngestionRouter = (
 	 * /v1/ingestion-sources/duplicates:
 	 *   get:
 	 *     summary: Count duplicate emails across the archive
-	 *     description: Counts extra copies of the same email: rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. Covers every ingestion source. Requires `manage:ingestion` permission.
+	 *     description: Counts extra copies of the same email, meaning rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. Covers every ingestion source. Requires `manage:ingestion` permission.
 	 *     operationId: countAllDuplicateEmails
 	 *     tags:
 	 *       - Ingestion
@@ -950,7 +950,7 @@ export const createIngestionRouter = (
 	 * /v1/ingestion-sources/{id}/duplicates:
 	 *   get:
 	 *     summary: Count duplicate emails in a source
-	 *     description: Counts extra copies of the same email: rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. For a source in a merge group, covers the whole group. Requires `read:ingestion` permission.
+	 *     description: Counts extra copies of the same email, meaning rows of one mailbox that share a Message-ID with an earlier row. These appeared when two sync cycles ran over one mailbox at the same time. For a source in a merge group, covers the whole group. Requires `read:ingestion` permission.
 	 *     operationId: countDuplicateEmails
 	 *     tags:
 	 *       - Ingestion
