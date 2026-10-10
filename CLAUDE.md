@@ -71,12 +71,14 @@ Known environment quirks:
 - **`dump.rdb` in the repo:** `redis-server` writes its snapshot into its working directory. Start it from `/tmp` with `--save ""`, as the hook does; delete a stray `dump.rdb`, never commit it.
 - **Stopping a server:** `pkill -f <pattern>` also matches the shell running the command when that command line contains the pattern, and kills it (exit code 144). Find the PID with `ps -eo pid,comm,args` filtered on `comm` instead.
 - **Drizzle schema drift:** the schema doesn't declare four `journaling_sources` columns that migration 0042 added (they are probably used by enterprise). `db:generate` will try to `DROP` them. Delete those statements from any new migration and keep the snapshot's `journaling_sources` columns as they were.
+- **VitePress templates:** the docs are Vue templates, so `{{ … }}` in inline code (a `docker inspect --format '{{json .Mounts}}'`, say) fails the docs build. Put it in a fenced code block.
 - **Formatting:** prettier formats JSON with tabs. Some committed files (`openapi.json`, migration meta, a few Svelte pages) were never prettier-clean upstream, so only format files you create or substantially rewrite, or files that were already clean. To check whether a file was clean before your change: `git show HEAD:<path> | npx prettier --check --stdin-filepath <path>`.
 
 ## Backend conventions
 
 - **Routes** (`src/api/routes/*.routes.ts`):
     - every endpoint has an `@openapi` JSDoc block, which `pnpm docs:gen-spec` turns into the spec; commit the regenerated `docs/api/openapi.json`
+    - the blocks are YAML: a colon followed by a space inside a description (`the same email: rows…`) breaks the block. The generator only prints a `YAMLSemanticError` and leaves the endpoint out of the spec, so check its output, or that the path count rose
     - routes that act on one record use `requirePermission(action, subject, { loadResource })`, so IAM conditions are evaluated against the record
     - long-running work returns `202` and runs as a job; responses include `workerAlive` from `isIndexingWorkerAlive()` so the UI can warn when no worker is running
 - **Controllers** return `{ message }` bodies with `req.t(...)` strings. Refusals that a client may want to branch on also carry a machine-readable `reason`.

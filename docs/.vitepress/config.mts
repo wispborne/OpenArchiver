@@ -102,6 +102,10 @@ export default defineConfig({
 								text: 'Long Message-ID Headers',
 								link: '/user-guides/troubleshooting/long-message-id',
 							},
+							{
+								text: 'Search Index Stuck',
+								link: '/user-guides/troubleshooting/search-index-stuck',
+							},
 						],
 					},
 				],

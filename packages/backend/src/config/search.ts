@@ -23,6 +23,23 @@ export const meiliConfig = {
 	/** Max milliseconds to wait for a Meilisearch task to finish before treating
 	 * the batch as failed (so BullMQ retries it). */
 	waitForTaskTimeoutMs: intFromEnv('MEILI_WAIT_FOR_TASK_TIMEOUT', 300_000, 1_000),
+	/**
+	 * How often a worker asks Meilisearch whether a task has finished. The client library's
+	 * default is 50ms, which with a few workers waiting is dozens of requests a second, each one
+	 * an INFO line in Meilisearch's log. A batch of documents takes far longer than this to index,
+	 * so a slower poll costs at most this much latency per batch.
+	 */
+	waitForTaskIntervalMs: intFromEnv('MEILI_WAIT_FOR_TASK_INTERVAL', 500, 10),
+	/**
+	 * Meilisearch tasks that may be waiting before workers stop adding more documents.
+	 *
+	 * Each indexing job waits for its own task before sending the next, so in normal running only
+	 * about as many tasks are pending as there are busy workers. A count far above that means
+	 * Meilisearch has stopped working through its queue. Without this limit every timed-out batch
+	 * was sent again as a new task while the old one stayed queued, and the periodic index check
+	 * added more on top: one stuck instance reached 204,773 pending tasks.
+	 */
+	maxPendingTasks: intFromEnv('MEILI_MAX_PENDING_TASKS', 1_000, 1),
 };
 
 /**

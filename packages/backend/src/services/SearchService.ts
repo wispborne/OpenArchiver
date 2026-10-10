@@ -24,6 +24,10 @@ import { archivedEmails } from '../database/schema';
 import { and, count, inArray, isNotNull, sql } from 'drizzle-orm';
 import { normalizeEmailAddress } from '../helpers/emailAddress';
 
+/** How long a count of Meilisearch's pending tasks is trusted. See assertQueueNotBackedUp. */
+const PENDING_TASKS_CACHE_MS = 5_000;
+const pendingTasksCache = { at: 0, total: 0 };
+
 export class SearchService {
 	private client: MeiliSearch;
 	private auditService: AuditService;
@@ -51,8 +55,40 @@ export class SearchService {
 		documents: T[],
 		primaryKey?: string
 	) {
+		await this.assertQueueNotBackedUp();
 		const index = await this.getIndex<T>(indexName);
 		return index.addDocuments(documents, primaryKey ? { primaryKey } : undefined);
+	}
+
+	/**
+	 * Refuses to add documents while Meilisearch's own task queue is far longer than normal.
+	 *
+	 * Thrown as an ordinary error, so the indexing job fails and BullMQ retries it, and the rows
+	 * stay `is_indexed = false` for the reconcile job to pick up once Meilisearch has recovered.
+	 * Nothing is counted against the documents themselves: they are not the problem.
+	 *
+	 * The count is cached for a few seconds, per process. A job sends many small chunks in quick
+	 * succession, and asking before every one would add a request per chunk to an engine that is
+	 * already struggling.
+	 */
+	private async assertQueueNotBackedUp(): Promise<void> {
+		const now = Date.now();
+		if (now - pendingTasksCache.at > PENDING_TASKS_CACHE_MS) {
+			const result = await this.client.tasks.getTasks({
+				statuses: ['enqueued', 'processing'],
+				limit: 1,
+			});
+			pendingTasksCache.at = now;
+			pendingTasksCache.total = result.total ?? 0;
+		}
+		const limit = config.meili.maxPendingTasks;
+		if (pendingTasksCache.total >= limit) {
+			throw new Error(
+				`Meilisearch has ${pendingTasksCache.total} tasks waiting (limit ${limit}, MEILI_MAX_PENDING_TASKS). ` +
+					'Holding these documents back until it catches up. If the number does not fall, ' +
+					'Meilisearch may be stuck: see "Search index stuck" in the troubleshooting docs.'
+			);
+		}
 	}
 
 	/**
@@ -63,6 +99,7 @@ export class SearchService {
 	public async waitForTask(taskUid: number) {
 		return this.client.tasks.waitForTask(taskUid, {
 			timeout: config.meili.waitForTaskTimeoutMs,
+			interval: config.meili.waitForTaskIntervalMs,
 		});
 	}
 

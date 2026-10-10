@@ -26,14 +26,16 @@ A background **reconcile** job runs on a schedule and re-queues any emails that 
 
 It is controlled by environment variables:
 
-| Variable                       | Default        | Purpose                                                                                                             |
-| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `INDEX_RECONCILE_ENABLED`      | `true`         | Enable/disable the periodic reconcile job.                                                                          |
-| `INDEX_RECONCILE_CRON`         | `*/30 * * * *` | How often reconcile runs (cron pattern).                                                                            |
-| `INDEX_RECONCILE_PAGE_CAP`     | `20`           | Max batches enqueued per run, so a large backlog drains over several runs.                                          |
-| `INDEX_RECONCILE_BACKPRESSURE` | `100`          | If the indexing queue already has this many jobs, the run defers.                                                   |
-| `MAX_INDEX_ATTEMPTS`           | `5`            | Stop retrying an email after this many failed indexing attempts (prevents a single bad email from looping forever). |
-| `MEILI_WAIT_FOR_TASK_TIMEOUT`  | `300000`       | Milliseconds to wait for a Meilisearch task before treating the batch as failed.                                    |
+| Variable                       | Default        | Purpose                                                                                                                                  |
+| ------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `INDEX_RECONCILE_ENABLED`      | `true`         | Enable/disable the periodic reconcile job.                                                                                               |
+| `INDEX_RECONCILE_CRON`         | `*/30 * * * *` | How often reconcile runs (cron pattern).                                                                                                 |
+| `INDEX_RECONCILE_PAGE_CAP`     | `20`           | Max batches enqueued per run, so a large backlog drains over several runs.                                                               |
+| `INDEX_RECONCILE_BACKPRESSURE` | `100`          | If the indexing queue already has this many jobs, the run defers.                                                                        |
+| `MAX_INDEX_ATTEMPTS`           | `5`            | Stop retrying an email after this many failed indexing attempts (prevents a single bad email from looping forever).                      |
+| `MEILI_WAIT_FOR_TASK_TIMEOUT`  | `300000`       | Milliseconds to wait for a Meilisearch task before treating the batch as failed.                                                         |
+| `MEILI_WAIT_FOR_TASK_INTERVAL` | `500`          | Milliseconds between checks on whether a Meilisearch task has finished.                                                                  |
+| `MEILI_MAX_PENDING_TASKS`      | `1000`         | Waiting Meilisearch tasks above which workers stop sending documents. See [Search Index Stuck](./troubleshooting/search-index-stuck.md). |
 
 ::: tip Looking for search filters?
 How to search the archive — keywords, advanced filters, date ranges, field-scoped search — is covered in [Searching the Archive](/user-guides/searching). Two things depend on this page and need a one-time reindex for mail archived on older versions: the **with/without attachments** filter (older mail is counted as "without attachments" until reindexed), and **resolved sender names in search results** (older mail shows the raw sender address instead of the display name until reindexed).
