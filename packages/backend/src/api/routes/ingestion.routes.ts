@@ -705,7 +705,7 @@ export const createIngestionRouter = (
 	 * /v1/ingestion-sources/{id}/mailboxes/unmerge:
 	 *   post:
 	 *     summary: Unmerge a mailbox
-	 *     description: Undoes a mailbox merge. The alias is removed and the emails that were moved are moved back in the background. Copies removed as duplicates during the merge are not restored by this; live sources archive them again on their next sync. Requires `update:ingestion` permission.
+	 *     description: Undoes a mailbox merge. The alias is removed and the emails that were moved are moved back in the background. Copies removed as duplicates during the merge are not restored by this, and later syncs do not bring them back. Requires `update:ingestion` permission.
 	 *     operationId: unmergeMailbox
 	 *     tags:
 	 *       - Ingestion

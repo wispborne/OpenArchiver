@@ -235,7 +235,7 @@
 			"unmerging": "Unmerging…",
 			"unmerge_title": "Unmerge mailbox",
 			"unmerge_description": "Move the emails that came from {{mailbox}} back out of {{into}}, and archive new mail from {{mailbox}} under its own address again.",
-			"unmerge_warning_duplicates": "Copies removed as duplicates during the merge are not restored. Live sources archive them again on their next sync; file imports do not.",
+			"unmerge_warning_duplicates": "Copies removed as duplicates during the merge are not restored, and later syncs do not bring them back. The copy kept in the target mailbox stays in the archive.",
 			"unmerge_started": "Mailbox unmerge started",
 			"unmerge_failed": "Mailbox unmerge failed"
 		},
