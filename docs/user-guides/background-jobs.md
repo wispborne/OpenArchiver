@@ -23,6 +23,8 @@ The card also counts the queue's jobs by state. Click a count to see those jobs:
 
 **Running now** lists every running job of both queues, with a progress bar for jobs that report progress, such as a mailbox merge. **Recent failures** lists the latest failed jobs.
 
+The dashboard shows the same at a glance: each queue's worker status and counts, and what is running now. It refreshes by itself, and is shown only to Super Admins.
+
 The page refreshes every few seconds while it is open. Turn **Auto-refresh** off to keep it still while you read.
 
 ## Job details

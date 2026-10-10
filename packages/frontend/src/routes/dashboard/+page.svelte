@@ -8,6 +8,7 @@
 	import TopSendersChart from '$lib/components/custom/charts/TopSendersChart.svelte';
 	import IngestionHistoryChart from '$lib/components/custom/charts/IngestionHistoryChart.svelte';
 	import StorageBySourceChart from '$lib/components/custom/charts/StorageBySourceChart.svelte';
+	import JobsSummaryCard from '$lib/components/custom/jobs/JobsSummaryCard.svelte';
 	import { t } from '$lib/translations';
 	let { data }: { data: PageData } = $props();
 
@@ -102,6 +103,8 @@
 					</a>
 				</div>
 			{/if}
+
+			<JobsSummaryCard />
 
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 				<div class=" lg:col-span-2">

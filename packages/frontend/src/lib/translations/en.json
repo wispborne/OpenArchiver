@@ -741,6 +741,8 @@
 			"indexed_insights": "Indexed insights",
 			"top_10_senders": "Top 10 Senders",
 			"top_senders_hint": "Click a bar to search that sender's emails.",
+			"jobs_open": "Open Jobs",
+			"jobs_more_running": "Also running: {{count}} more. See the Jobs page.",
 			"no_indexed_insights": "No indexed insights available."
 		},
 		"retention_policies": {
