@@ -30,6 +30,10 @@
 		"archive": {
 			"title": "Archive",
 			"no_subject": "No Subject",
+			"back": "Back",
+			"search_sender": "Search emails from this sender",
+			"search_recipient": "Search emails to this recipient",
+			"search_mailbox": "Search this mailbox's emails",
 			"from": "From",
 			"mailbox": "Mailbox",
 			"ingestion_source": "Ingestion source",
@@ -113,6 +117,9 @@
 			"dedupe_deletion_disabled": "Removing duplicates deletes archived emails, which this instance does not allow. Set ENABLE_DELETION=true on the server and restart it to use this.",
 			"bulk_actions": "Bulk Actions",
 			"force_sync": "Force Sync",
+			"force_sync_failed": "Could not start the sync",
+			"search_source": "Search this source",
+			"search_mailbox": "Search this mailbox's emails",
 			"reindex": "Reindex",
 			"reindex_success": "Reindex has been triggered.",
 			"reindex_all": "Reindex All",
@@ -709,6 +716,7 @@
 			"no_ingestion_sources": "No ingestion sources available.",
 			"indexed_insights": "Indexed insights",
 			"top_10_senders": "Top 10 Senders",
+			"top_senders_hint": "Click a bar to search that sender's emails.",
 			"no_indexed_insights": "No indexed insights available."
 		},
 		"retention_policies": {

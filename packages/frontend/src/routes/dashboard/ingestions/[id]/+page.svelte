@@ -20,14 +20,19 @@
 		Database,
 		Merge,
 		CopyMinus,
+		ChevronDown,
+		RefreshCw,
+		Search,
 	} from 'lucide-svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { forceSync, runReindex, searchUrl } from '$lib/ingestionActions';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import MailboxMergeDialog from '$lib/components/custom/MailboxMergeDialog.svelte';
 	import DuplicateCleanupDialog from '$lib/components/custom/DuplicateCleanupDialog.svelte';
 	import { setAlert } from '$lib/components/custom/alert/alert-state.svelte';
 	import { api } from '$lib/api.client';
 	import { invalidateAll } from '$app/navigation';
-	import type { MailboxAlias, MailboxMergeDispatch } from '@open-archiver/types';
+	import type { MailboxAlias, MailboxMergeDispatch, ReindexMode } from '@open-archiver/types';
 	import { t } from '$lib/translations';
 
 	let { data }: { data: PageData } = $props();
@@ -55,6 +60,36 @@
 	);
 
 	let isDedupeDialogOpen = $state(false);
+
+	// Mail of a merge group is stored and indexed under the root's id, so a search scoped to a
+	// child's own id would match nothing.
+	let rootSourceId = $derived(data.source?.mergedIntoId ?? stats.sourceId);
+
+	let isSyncing = $state(false);
+	const handleSync = async () => {
+		if (isSyncing) return;
+		isSyncing = true;
+		try {
+			if (await forceSync(stats.sourceId)) {
+				await invalidateAll();
+			}
+		} finally {
+			isSyncing = false;
+		}
+	};
+
+	let isReindexing = $state(false);
+	const handleReindex = async (mode: ReindexMode) => {
+		if (isReindexing) return;
+		isReindexing = true;
+		try {
+			if (await runReindex(`/ingestion-sources/${stats.sourceId}/reindex`, mode, 'source')) {
+				await invalidateAll();
+			}
+		} finally {
+			isReindexing = false;
+		}
+	};
 
 	let isMergeDialogOpen = $state(false);
 	let mergeFrom = $state('');
@@ -140,24 +175,64 @@
 					<Mail class="mr-2 h-4 w-4" />
 					{$t('app.ingestions.view_emails')}
 				</Button>
-				<Button variant="outline" onclick={() => (isDedupeDialogOpen = true)}>
-					<CopyMinus class="mr-2 h-4 w-4" />
-					{$t('app.ingestions.remove_duplicates')}
+				<Button variant="outline" href={searchUrl({ sources: rootSourceId })}>
+					<Search class="mr-2 h-4 w-4" />
+					{$t('app.ingestions.search_source')}
 				</Button>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="outline">
+								{$t('app.ingestions.actions')}
+								<ChevronDown class="ml-2 h-4 w-4" />
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end">
+						<!-- Not `disabled={isSyncing}`: the item would disable itself during its own
+						     click, and the menu then never closes and leaves the page unclickable.
+						     handleSync ignores repeat clicks instead. -->
+						<DropdownMenu.Item onclick={handleSync}>
+							<RefreshCw class="mr-2 h-4 w-4" />
+							{$t('app.ingestions.force_sync')}
+						</DropdownMenu.Item>
+						<DropdownMenu.Sub>
+							<DropdownMenu.SubTrigger>
+								<Database class="mr-2 h-4 w-4" />
+								{$t('app.ingestions.reindex')}
+							</DropdownMenu.SubTrigger>
+							<DropdownMenu.SubContent>
+								<DropdownMenu.Item onclick={() => handleReindex('missing')}>
+									{$t('app.ingestions.reindex_missing')}
+								</DropdownMenu.Item>
+								<DropdownMenu.Item onclick={() => handleReindex('full')}>
+									{$t('app.ingestions.reindex_full')}
+								</DropdownMenu.Item>
+							</DropdownMenu.SubContent>
+						</DropdownMenu.Sub>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Item onclick={() => (isDedupeDialogOpen = true)}>
+							<CopyMinus class="mr-2 h-4 w-4" />
+							{$t('app.ingestions.remove_duplicates')}
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			</div>
 		</div>
 
 		<!-- Summary stat cards -->
 		<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-			<Card.Root>
-				<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
-					<Card.Title class="text-sm font-medium">{$t('app.ingestions.total_emails')}</Card.Title>
-					<Mail class="text-muted-foreground h-4 w-4" />
-				</Card.Header>
-				<Card.Content>
-					<div class="text-primary text-2xl font-bold">{stats.totalEmails.toLocaleString()}</div>
-				</Card.Content>
-			</Card.Root>
+			<a href="/dashboard/archived-emails?ingestionSourceId={stats.sourceId}" class="block rounded-xl">
+				<Card.Root class="hover:bg-muted/50 h-full transition-colors">
+					<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
+						<Card.Title class="text-sm font-medium">{$t('app.ingestions.total_emails')}</Card.Title>
+						<Mail class="text-muted-foreground h-4 w-4" />
+					</Card.Header>
+					<Card.Content>
+						<div class="text-primary text-2xl font-bold">{stats.totalEmails.toLocaleString()}</div>
+					</Card.Content>
+				</Card.Root>
+			</a>
 
 			<Card.Root>
 				<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -262,6 +337,18 @@
 					</span>
 				</div>
 				<Progress value={coverage} max={100} />
+				{#if stats.indexedCount < stats.totalEmails}
+					<Button
+						variant="outline"
+						size="sm"
+						class="mt-2"
+						disabled={isReindexing}
+						onclick={() => handleReindex('missing')}
+					>
+						<Database class="mr-2 h-4 w-4" />
+						{$t('app.ingestions.reindex_missing')}
+					</Button>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 
@@ -301,7 +388,11 @@
 								{#each stats.mailboxes as mailbox (mailbox.userEmail)}
 									<Table.Row>
 										<Table.Cell class="font-mono text-sm">
-											{mailbox.userEmail}
+											<a
+												class="hover:underline"
+												href={searchUrl({ mailboxes: mailbox.userEmail, sources: rootSourceId })}
+												title={$t('app.ingestions.search_mailbox')}>{mailbox.userEmail}</a
+											>
 											{#if aliasesByMailbox[mailbox.userEmail]}
 												<p class="text-muted-foreground font-sans text-xs">
 													{$t('app.mailbox_merge.merged_from', {

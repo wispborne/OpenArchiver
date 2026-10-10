@@ -5,8 +5,12 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
-export function formatBytes(bytes: number, decimals = 2) {
-	if (bytes === 0) return '0 Bytes';
+export function formatBytes(value: number, decimals = 2) {
+	// Coerced rather than trusted: some sizes arrive as numeric strings (a Postgres bigint sum),
+	// and a source with no archived mail reports null (a sum over no rows), which the arithmetic
+	// below turned into "NaN undefined".
+	const bytes = Number(value);
+	if (!bytes || !Number.isFinite(bytes)) return '0 Bytes';
 
 	const k = 1024;
 	const dm = decimals < 0 ? 0 : decimals;

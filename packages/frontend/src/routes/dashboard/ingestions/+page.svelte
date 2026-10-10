@@ -11,12 +11,12 @@
 	import DuplicateCleanupDialog from '$lib/components/custom/DuplicateCleanupDialog.svelte';
 	import OAuthDeviceCodeDialog from '$lib/components/custom/OAuthDeviceCodeDialog.svelte';
 	import { api } from '$lib/api.client';
+	import { forceSync, runReindex } from '$lib/ingestionActions';
 	import type {
 		SafeIngestionSource,
 		CreateIngestionSourceDto,
 		IndexHealth,
 		ReindexMode,
-		IReindexResponse,
 		OAuthAuthorizeResponse,
 	} from '@open-archiver/types';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
@@ -252,103 +252,12 @@
 	};
 
 	const handleSync = async (id: string) => {
-		const res = await api(`/ingestion-sources/${id}/sync`, { method: 'POST' });
-		if (!res.ok) {
-			const errorBody = await res.json();
-			setAlert({
-				type: 'error',
-				title: 'Failed to trigger force sync ingestion',
-				message: errorBody.message || JSON.stringify(errorBody),
-				duration: 5000,
-				show: true,
-			});
-			return;
-		}
+		if (!(await forceSync(id))) return;
 		ingestionSources = ingestionSources.map((s) => {
 			if (s.id === id) {
 				return { ...s, status: 'syncing' as const };
 			}
 			return s;
-		});
-	};
-
-	/**
-	 * Reports what a reindex actually achieved rather than that the request was accepted.
-	 *
-	 * A 202 only means the job reached the queue. It says nothing about whether an indexing worker
-	 * exists to run it, or whether there was anything to do — and both of those have silently been
-	 * false in practice, leaving a success message on screen while nothing happened.
-	 */
-	const runReindex = async (path: string, mode: ReindexMode, scope: 'source' | 'all') => {
-		let body: Partial<IReindexResponse>;
-
-		try {
-			const res = await api(path, { method: 'POST', body: JSON.stringify({ mode }) });
-			// Not res.json() straight into a variable: a proxy answering with an HTML 502 body makes
-			// this reject, and an unhandled rejection inside a menu onclick closes the menu with no
-			// alert at all — the user sees a click that did nothing.
-			body = await res.json().catch(() => ({}));
-
-			if (!res.ok) {
-				setAlert({
-					type: 'error',
-					title: $t('app.ingestions.reindex_failed'),
-					message: (body as { message?: string }).message ?? `HTTP ${res.status}`,
-					duration: 5000,
-					show: true,
-				});
-				return;
-			}
-		} catch (error) {
-			setAlert({
-				type: 'error',
-				title: $t('app.ingestions.reindex_failed'),
-				message: error instanceof Error ? error.message : String(error),
-				duration: 5000,
-				show: true,
-			});
-			return;
-		}
-
-		const count = body.pending ?? 0;
-
-		if (body.pending === 0) {
-			setAlert({
-				type: 'warning',
-				title: $t('app.ingestions.reindex_nothing_title'),
-				message: $t(
-					scope === 'all'
-						? 'app.ingestions.reindex_nothing_all'
-						: mode === 'full'
-							? 'app.ingestions.reindex_nothing_full'
-							: 'app.ingestions.reindex_nothing'
-				),
-				duration: 8000,
-				show: true,
-			});
-			return;
-		}
-
-		// A warning, not an error, and reported after the count: the job IS durably queued — the
-		// enqueue happens before the liveness check — so telling the user it failed would be wrong and
-		// would invite a repeat click that stacks another full rebuild.
-		if (body.workerAlive === false) {
-			setAlert({
-				type: 'warning',
-				title: $t('app.ingestions.reindex_no_worker_title'),
-				message: $t('app.ingestions.reindex_no_worker', { count } as any),
-				duration: 10000,
-				show: true,
-			});
-			return;
-		}
-
-		setAlert({
-			type: 'success',
-			title: $t('app.ingestions.reindex_success'),
-			message: $t('app.ingestions.reindex_queued', { count } as any),
-			duration: 5000,
-			show: true,
 		});
 	};
 

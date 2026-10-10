@@ -5,6 +5,7 @@
 	import type { ChartConfig } from '$lib/components/ui/chart';
 	import { formatBytes } from '$lib/utils';
 	import { t } from '$lib/translations';
+	import { goto } from '$app/navigation';
 
 	export let data: IngestionSourceStats[];
 
@@ -47,7 +48,10 @@
 	below has a fixed height and cannot scroll, and this list scrolls without resizing anything.
 -->
 <div class="flex h-full flex-col gap-4">
-	<Chart.Container config={chartConfig} class="h-[220px] w-full shrink-0 overflow-hidden">
+	<Chart.Container
+		config={chartConfig}
+		class="h-[220px] w-full shrink-0 overflow-hidden [&_path]:cursor-pointer"
+	>
 		<PieChart
 			{data}
 			key="name"
@@ -55,6 +59,7 @@
 			label="name"
 			legend={false}
 			cRange={sliceColors}
+			onArcClick={(_e, { data }) => goto(`/dashboard/ingestions/${data.id}`)}
 		>
 			{#snippet tooltip()}
 				<Chart.Tooltip>
@@ -75,7 +80,11 @@
 					class="size-2.5 shrink-0 rounded-[2px]"
 					style="background-color: {sliceColors[index % sliceColors.length]}"
 				></span>
-				<span class="truncate" title={source.name}>{source.name}</span>
+				<a
+					href="/dashboard/ingestions/{source.id}"
+					class="truncate hover:underline"
+					title={source.name}>{source.name}</a
+				>
 				<span class="text-muted-foreground ml-auto shrink-0 tabular-nums">
 					{formatBytes(source.storageUsed)}
 				</span>

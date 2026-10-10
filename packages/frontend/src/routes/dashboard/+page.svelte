@@ -44,55 +44,62 @@
 		<div class="space-y-4">
 			{#if data.stats}
 				<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-					<Card.Root>
-						<Card.Header
-							class="flex flex-row items-center justify-between space-y-0 pb-2"
-						>
-							<Card.Title class="text-sm font-medium">
-								{$t('app.dashboard_page.total_emails_archived')}
-							</Card.Title>
-							<Archive class="text-muted-foreground h-4 w-4" />
-						</Card.Header>
-						<Card.Content>
-							<div class="text-primary text-2xl font-bold">
-								{data.stats.totalEmailsArchived}
-							</div>
-						</Card.Content>
-					</Card.Root>
-					<Card.Root>
-						<Card.Header
-							class="flex flex-row items-center justify-between space-y-0 pb-2"
-						>
-							<Card.Title class="text-sm font-medium"
-								>{$t('app.dashboard_page.total_storage_used')}</Card.Title
+					<a href="/dashboard/archived-emails" class="block rounded-xl">
+						<Card.Root class="hover:bg-muted/50 h-full transition-colors">
+							<Card.Header
+								class="flex flex-row items-center justify-between space-y-0 pb-2"
 							>
-							<HardDrive class="text-muted-foreground h-4 w-4" />
-						</Card.Header>
-						<Card.Content>
-							<div class="text-primary text-2xl font-bold">
-								{formatBytes(data.stats.totalStorageUsed)}
-							</div>
-						</Card.Content>
-					</Card.Root>
-					<Card.Root class="">
-						<Card.Header
-							class="flex flex-row items-center justify-between space-y-0 pb-2"
-						>
-							<Card.Title class="text-sm font-medium">
-								{$t('app.dashboard_page.failed_ingestions')}
-							</Card.Title>
-							<CircleAlert class=" text-muted-foreground h-4 w-4" />
-						</Card.Header>
-						<Card.Content>
-							<div
-								class=" text-2xl font-bold"
-								class:text-destructive={data.stats.failedIngestionsLast7Days > 0}
-								class:text-green-600={data.stats.failedIngestionsLast7Days <= 0}
+								<Card.Title class="text-sm font-medium">
+									{$t('app.dashboard_page.total_emails_archived')}
+								</Card.Title>
+								<Archive class="text-muted-foreground h-4 w-4" />
+							</Card.Header>
+							<Card.Content>
+								<div class="text-primary text-2xl font-bold">
+									{data.stats.totalEmailsArchived}
+								</div>
+							</Card.Content>
+						</Card.Root>
+					</a>
+					<a href="/dashboard/ingestions" class="block rounded-xl">
+						<Card.Root class="hover:bg-muted/50 h-full transition-colors">
+							<Card.Header
+								class="flex flex-row items-center justify-between space-y-0 pb-2"
 							>
-								{data.stats.failedIngestionsLast7Days}
-							</div>
-						</Card.Content>
-					</Card.Root>
+								<Card.Title class="text-sm font-medium"
+									>{$t('app.dashboard_page.total_storage_used')}</Card.Title
+								>
+								<HardDrive class="text-muted-foreground h-4 w-4" />
+							</Card.Header>
+							<Card.Content>
+								<div class="text-primary text-2xl font-bold">
+									{formatBytes(data.stats.totalStorageUsed)}
+								</div>
+							</Card.Content>
+						</Card.Root>
+					</a>
+					<a href="/dashboard/ingestions" class="block rounded-xl">
+						<Card.Root class="hover:bg-muted/50 h-full transition-colors">
+							<Card.Header
+								class="flex flex-row items-center justify-between space-y-0 pb-2"
+							>
+								<Card.Title class="text-sm font-medium">
+									{$t('app.dashboard_page.failed_ingestions')}
+								</Card.Title>
+								<CircleAlert class=" text-muted-foreground h-4 w-4" />
+							</Card.Header>
+							<Card.Content>
+								<div
+									class=" text-2xl font-bold"
+									class:text-destructive={data.stats.failedIngestionsLast7Days >
+										0}
+									class:text-green-600={data.stats.failedIngestionsLast7Days <= 0}
+								>
+									{data.stats.failedIngestionsLast7Days}
+								</div>
+							</Card.Content>
+						</Card.Root>
+					</a>
 				</div>
 			{/if}
 

@@ -30,7 +30,8 @@
 	import { enhance } from '$app/forms';
 	import type { LegalHold, EmailLegalHoldInfo } from '@open-archiver/types';
 	import PostalMime, { type Attachment as PostalAttachment } from 'postal-mime';
-	import { Paperclip } from 'lucide-svelte';
+	import { Paperclip, ArrowLeft } from 'lucide-svelte';
+	import { searchUrl } from '$lib/ingestionActions';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let email = $derived(data.email);
@@ -283,17 +284,37 @@
 </svelte:head>
 
 {#if email}
+	<!-- Back through history rather than to a fixed page: this view is reached from the email
+	     list, a search, a thread or another email, and only history knows which. A fresh tab has
+	     nothing to go back to, so it falls back to the list. -->
+	<button
+		type="button"
+		class="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 text-sm"
+		onclick={() => (history.length > 1 ? history.back() : goto('/dashboard/archived-emails'))}
+	>
+		<ArrowLeft class="h-4 w-4" />
+		{$t('app.archive.back')}
+	</button>
 	<div class="grid grid-cols-3 gap-6">
 		<div class="col-span-3 md:col-span-2">
 			<Card.Root>
 				<Card.Header>
 					<Card.Title>{email.subject || $t('app.archive.no_subject')}</Card.Title>
 					<Card.Description>
-						{$t('app.archive.from')}: {email.senderName && email.senderEmail
-							? `${email.senderName} <${email.senderEmail}>`
-							: email.senderName || email.senderEmail} | {$t('app.archive.sent')}: {new Date(
-							email.sentAt
-						).toLocaleString()}
+						{$t('app.archive.from')}:
+						{#if email.senderEmail}
+							<a
+								class="hover:text-foreground hover:underline"
+								href={searchUrl({ from: email.senderEmail })}
+								title={$t('app.archive.search_sender')}
+								>{email.senderName
+									? `${email.senderName} <${email.senderEmail}>`
+									: email.senderEmail}</a
+							>
+						{:else}
+							{email.senderName}
+						{/if}
+						| {$t('app.archive.sent')}: {new Date(email.sentAt).toLocaleString()}
 					</Card.Description>
 				</Card.Header>
 				<Card.Content>
@@ -301,9 +322,17 @@
 						<div class="space-y-1">
 							<h3 class="font-semibold">{$t('app.archive.recipients')}</h3>
 							<p class="text-muted-foreground text-sm">
-								{$t('app.archive.to')}: {email.recipients
-									.map((r) => r.email || r.name)
-									.join(', ')}
+								{$t('app.archive.to')}:
+								{#each email.recipients as r, i}
+									{#if r.email}
+										<a
+											class="hover:text-foreground hover:underline"
+											href={searchUrl({ to: r.email })}
+											title={$t('app.archive.search_recipient')}>{r.email}</a
+										>{:else}{r.name}{/if}{i < email.recipients.length - 1
+										? ', '
+										: ''}
+								{/each}
 							</p>
 						</div>
 						<div class="space-y-1">
@@ -311,8 +340,11 @@
 							<div class="text-muted-foreground space-y-2 text-sm">
 								<div class="flex flex-wrap items-center gap-2">
 									<span>{$t('app.archive.mailbox')}:</span>
-									<span class="bg-muted truncate rounded p-1.5 text-xs"
-										>{email.userEmail}</span
+									<a
+										href={searchUrl({ mailboxes: email.userEmail })}
+										title={$t('app.archive.search_mailbox')}
+										class="bg-muted hover:bg-muted/80 truncate rounded p-1.5 text-xs underline-offset-2 hover:underline"
+										>{email.userEmail}</a
 									>
 								</div>
 								{#if email.ingestionSource}
