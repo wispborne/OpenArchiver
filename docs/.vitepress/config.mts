@@ -40,6 +40,7 @@ export default defineConfig({
 					{ text: 'Search Indexing & Reindexing', link: '/user-guides/search-indexing' },
 					{ text: 'Removing Duplicate Emails', link: '/user-guides/removing-duplicates' },
 					{ text: 'Background Jobs', link: '/user-guides/background-jobs' },
+					{ text: 'MCP Server (AI Assistants)', link: '/user-guides/mcp-server' },
 					{
 						text: 'Email Providers',
 						link: '/user-guides/email-providers/',

@@ -5,6 +5,8 @@
 
 **Image:** `ghcr.io/wispborne/open-archiver`, rebuilt on every push to `main` that changes code. Tags: `latest`, `main`, and the first 12 characters of the commit SHA. Pin a SHA tag if you want to choose when you update.
 
+**MCP server image:** `ghcr.io/wispborne/open-archiver-mcp`, same tags, rebuilt when the MCP server changes. See [MCP Server](docs/user-guides/mcp-server.md).
+
 ### Installing
 
 The fork runs with the same `docker-compose.yml` as upstream; only the app image differs. A `docker-compose.override.yml` swaps it without editing upstream's file.
@@ -57,6 +59,7 @@ Kept current as the fork changes. Newest first within each group.
 
 **New features**
 
+- **MCP server for AI assistants** (`packages/mcp-server`, image `ghcr.io/wispborne/open-archiver-mcp`). Lets Claude Code, Claude Desktop, Cursor, Open WebUI and other MCP clients search and read the archive: search, emails, threads, attachment text, sources and statistics. Read-only, and it goes through the REST API with an API key, so roles and the audit log apply. Runs over stdio or HTTP. See [MCP Server](docs/user-guides/mcp-server.md).
 - **Repair attachment files** (Admin → Jobs → Maintenance). Finds attachment records whose stored file is missing, rebuilds what it can from the stored emails, reports the emails it can't fix, and gives old records with no source their email's source. See [Background Jobs](docs/user-guides/background-jobs.md#maintenance-repair-attachment-files).
 - **Background jobs on the dashboard.** Super Admins see each queue's worker status and counts, and the jobs running now with their progress.
 - **Jobs page redesign** (Admin → Jobs).
@@ -98,7 +101,7 @@ Kept current as the fork changes. Newest first within each group.
 
 - [`CLAUDE.md`](CLAUDE.md) describes the fork's goals, conventions and known pitfalls.
 - `.claude/hooks/session-start.sh` prepares Claude Code cloud sessions.
-- `.github/workflows/ghcr.yml` publishes the image. Upstream's Docker Hub workflows are disabled in this repository.
+- `.github/workflows/ghcr.yml` publishes the image, and `ghcr-mcp.yml` the MCP server's. Upstream's Docker Hub workflows are disabled in this repository.
 
 ---
 

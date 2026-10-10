@@ -121,11 +121,15 @@ Known environment quirks:
 - Don't set `disabled` on a bits-ui `DropdownMenu.Item` from state its own `onclick` changes: the item disables itself mid-click, the menu stays open and the page stops taking clicks. Ignore repeat clicks inside the handler instead.
 - For UI/UX work, check the result in a real browser at desktop and phone widths and look at the screenshots before calling it done.
 
-## MCP server (planned)
+## MCP server
 
-Not built yet. The agreed plan and a handoff for whoever builds it are in `.claude/plans/mcp-server.md`. Intended shape, unless decided otherwise:
+`packages/mcp-server`: a read-only MCP server (official TypeScript SDK) that exposes the archive to AI clients. User guide: `docs/user-guides/mcp-server.md`. The OpenSpec change `openspec/changes/add-mcp-server/` holds its spec and design decisions.
 
-- A new workspace package (for example `packages/mcp-server`) using the official TypeScript MCP SDK.
-- It talks to the REST API over HTTP with an API key (`X-API-KEY` header; keys are created in the UI or via `/v1/api-keys`), never directly to Postgres or Meilisearch. That keeps permissions, audit logging and IAM in one place, and it is why the API must stay stable.
-- Tools map onto existing endpoints: search, read an archived email or thread, list sources, per-source stats, mailbox listing. Write or destructive tools (sync, merge, delete) should be opt-in and clearly labelled.
-- Reuse request and response types from `@open-archiver/types`. When the MCP server needs data the API doesn't expose, add an endpoint first (with `@openapi` docs), then the tool.
+- It talks to the REST API over HTTP with an API key (`X-API-KEY`), never to Postgres or Meilisearch. That keeps permissions, audit logging and IAM in one place, and it is why the API must stay stable.
+- `OPEN_ARCHIVER_URL` is the app's URL; the client calls `{url}/api/v1/...` through the SvelteKit proxy, the address users know.
+- Tools are `archive_*`, read-only (`readOnlyHint`, `idempotentHint`, `openWorldHint: false`), with strict zod input schemas and output schemas; every result carries `structuredContent` plus a JSON text block. Shared rules live in the server `instructions` (`src/instructions.ts`), not in each description.
+- Email-derived text (subjects, bodies, snippets, attachment text) goes only in its own result fields; server guidance goes in `hints` and error messages, which must never interpolate email text (prompt-injection hygiene).
+- Built with esbuild into one dependency-free file, `dist/index.js` (`pnpm --filter @open-archiver/mcp-server build`), run as `node dist/index.js stdio|http`. The Docker image (`packages/mcp-server/Dockerfile`, published by `.github/workflows/ghcr-mcp.yml`) defaults to HTTP.
+- HTTP mode is stateless (a server per request, keyed by the request's `Authorization: Bearer` API key), validates the Host header against `MCP_ALLOWED_HOSTS`, and forwards the client IP as `X-Forwarded-For` so the API's per-IP rate limit counts clients separately. It is meant for localhost or a Docker network; there is no OAuth.
+- Write or destructive tools (sync, merge, delete) don't exist; if added, they should be opt-in and clearly labelled. When a tool needs data the API doesn't expose, add an endpoint first (with `@openapi` docs), then the tool. `GET /v1/archived-emails/{id}/content` and the `fields`/`crop` search parameters were added this way.
+- Verify by running it: `packages/mcp-server/eval/seed.py` writes a seed archive, and `eval/questions.md` lists questions with expected answers to run in a real client. Over stdio, a test client built on the SDK's `Client` checks every result against its output schema.

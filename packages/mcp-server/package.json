@@ -1,0 +1,29 @@
+{
+	"name": "@open-archiver/mcp-server",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Read-only MCP server that exposes an Open Archiver archive to AI clients through the REST API",
+	"license": "MIT License",
+	"type": "module",
+	"bin": {
+		"open-archiver-mcp": "dist/index.js"
+	},
+	"scripts": {
+		"build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --banner:js=\"#!/usr/bin/env node\nimport { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+		"typecheck": "tsc --noEmit -p .",
+		"start:stdio": "node dist/index.js stdio",
+		"start:http": "node dist/index.js http"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "1.30.1",
+		"express": "^5.2.1",
+		"zod": "^4.1.5"
+	},
+	"devDependencies": {
+		"@open-archiver/types": "workspace:*",
+		"@types/express": "^5.0.3",
+		"@types/node": "^24.0.13",
+		"esbuild": "0.28.2",
+		"typescript": "^5.8.3"
+	}
+}
