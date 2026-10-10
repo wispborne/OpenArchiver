@@ -64,7 +64,7 @@ On upgrade, existing emails are marked as indexed to avoid re-indexing the whole
 
 ### Watching progress
 
-Reindexing enqueues batches onto the `indexing` queue. You can watch them drain in **Admin → Jobs** (the `indexing` queue), and the index-health figure will climb as batches complete. If jobs pile up in _waiting_ and never move, make sure the **indexing worker** process is running.
+Reindexing enqueues batches onto the `indexing` queue. You can watch them drain in **Admin → Jobs** (the Indexing queue), and the index-health figure will climb as batches complete. If jobs pile up in _waiting_ and never move, check the queue's worker status on that page, and whether the queue is paused. See [Background Jobs](./background-jobs.md).
 
 ## Per-source statistics
 

@@ -1,212 +1,187 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import type { IJob } from '@open-archiver/types';
 	import * as Card from '$lib/components/ui/card';
-	import { t } from '$lib/translations';
-	import * as Table from '$lib/components/ui/table';
+	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button';
-	import { goto } from '$app/navigation';
-	import type { JobStatus } from '@open-archiver/types';
-	import * as Pagination from '$lib/components/ui/pagination/index.js';
-	import ChevronLeft from 'lucide-svelte/icons/chevron-left';
-	import ChevronRight from 'lucide-svelte/icons/chevron-right';
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
+	import { Badge } from '$lib/components/ui/badge';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
+	import { t } from '$lib/translations';
+	import AutoRefresh from '$lib/components/custom/jobs/AutoRefresh.svelte';
+	import JobList from '$lib/components/custom/jobs/JobList.svelte';
+	import JobDetailDialog from '$lib/components/custom/jobs/JobDetailDialog.svelte';
+	import QueueControls from '$lib/components/custom/jobs/QueueControls.svelte';
+	import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 	let queue = $derived(data.queue);
+	let now = $state(Date.now());
 
-	const jobStatuses: JobStatus[] = [
-		'failed',
-		'active',
-		'completed',
-		'delayed',
-		'waiting',
-		'paused',
-	];
+	const tabs = [
+		{ status: 'active', key: 'tab_active' },
+		{ status: 'waiting', key: 'tab_waiting' },
+		{ status: 'delayed', key: 'tab_delayed' },
+		{ status: 'failed', key: 'tab_failed' },
+		{ status: 'completed', key: 'tab_completed' },
+	] as const;
+	const count = (status: string) => {
+		const c = queue.counts as unknown as Record<string, number | undefined>;
+		return status === 'waiting' ? (c.waiting ?? 0) + (c.prioritized ?? 0) : (c[status] ?? 0);
+	};
 
-	let selectedStatus: JobStatus | undefined = $state('failed');
+	const urlFor = (params: Record<string, string | null>) => {
+		const url = new URL(page.url);
+		for (const [k, v] of Object.entries(params)) {
+			if (v === null) url.searchParams.delete(k);
+			else url.searchParams.set(k, v);
+		}
+		return `${url.pathname}${url.search}`;
+	};
 
-	onMount(() => {
-		if (browser) {
-			const url = new URL(window.location.href);
-			const status = url.searchParams.get('status') as JobStatus;
-			if (status) {
-				selectedStatus = status;
-			}
+	// The open job lives in the URL (?job=…), so a job can be linked to and the back button closes it.
+	let detailId = $derived(page.url.searchParams.get('job'));
+	let detailOpen = $state(false);
+	$effect(() => {
+		detailOpen = !!detailId;
+	});
+	const openJob = (job: IJob) =>
+		goto(urlFor({ job: job.id ?? null }), { noScroll: true, keepFocus: true });
+	$effect(() => {
+		if (!detailOpen && detailId) {
+			goto(urlFor({ job: null }), { noScroll: true, keepFocus: true, replaceState: true });
 		}
 	});
-
-	function handleStatusChange(status: JobStatus) {
-		selectedStatus = status;
-		const url = new URL(window.location.href);
-		url.searchParams.set('status', status);
-		url.searchParams.set('page', '1');
-		goto(url.toString(), { invalidateAll: true });
-	}
 </script>
 
 <svelte:head>
-	<title>{queue.name} - {$t('app.jobs.title')} - Open Archiver</title>
+	<title>{$t(`app.jobs.queue_${queue.name}`)} - {$t('app.jobs.page_title')} - Open Archiver</title
+	>
 </svelte:head>
 
 <div class="space-y-4">
-	<a href="/dashboard/admin/jobs" class="text-primary mb-1 text-sm hover:underline">
-		&larr; {$t('app.jobs.back_to_queues')}
+	<a
+		href="/dashboard/admin/jobs"
+		class="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm"
+	>
+		<ArrowLeft class="h-4 w-4" />
+		{$t('app.jobs.page_title')}
 	</a>
-	<h1 class="text-2xl font-bold capitalize">{queue.name.split('_').join(' ')}</h1>
+
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+		<div class="space-y-1">
+			<h1 class="flex flex-wrap items-center gap-2 text-2xl font-bold">
+				{$t(`app.jobs.queue_${queue.name}`)}
+				{#if queue.isPaused}
+					<Badge variant="secondary">{$t('app.jobs.queue_paused')}</Badge>
+				{/if}
+			</h1>
+			<p class="text-muted-foreground text-sm">
+				{$t(`app.jobs.queue_${queue.name}_description`)}
+			</p>
+			<p class="flex items-center gap-2 text-sm">
+				<span
+					class="h-2 w-2 rounded-full {queue.workerAlive === false
+						? 'bg-destructive'
+						: 'bg-green-600'}"
+				></span>
+				{queue.workerAlive === false
+					? $t('app.jobs.worker_not_running')
+					: $t('app.jobs.worker_running')}
+			</p>
+		</div>
+		<div class="flex flex-col items-start gap-2 sm:items-end">
+			<QueueControls {queue} onChanged={() => invalidateAll()} />
+			<AutoRefresh bind:now />
+		</div>
+	</div>
+
+	{#if queue.workerAlive === false}
+		<Alert.Root variant="destructive">
+			<Alert.Description>{$t('app.jobs.worker_not_running_help')}</Alert.Description>
+		</Alert.Root>
+	{/if}
+	{#if queue.isPaused}
+		<Alert.Root>
+			<Alert.Description>{$t('app.jobs.queue_paused_help')}</Alert.Description>
+		</Alert.Root>
+	{/if}
 
 	<Card.Root>
-		<Card.Header>
-			<Card.Title>{$t('app.jobs.jobs')}</Card.Title>
-			<div class="flex flex-wrap space-x-2 space-y-2">
-				{#each jobStatuses as status}
-					<Button
-						variant={selectedStatus === status ? 'default' : 'outline'}
-						onclick={() => handleStatusChange(status)}
-						class="capitalize"
+		<Card.Header class="pb-3">
+			<!-- Tabs as links: each status is its own URL, so it survives a reload and can be shared. -->
+			<nav class="-mx-1 flex gap-1 overflow-x-auto pb-1" aria-label={$t('app.jobs.jobs')}>
+				{#each tabs as tab}
+					{@const n = count(tab.status)}
+					{@const selected = data.status === tab.status}
+					<a
+						href={urlFor({ status: tab.status, page: null, job: null })}
+						aria-current={selected ? 'page' : undefined}
+						class="flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors {selected
+							? 'bg-primary text-primary-foreground'
+							: 'hover:bg-muted'}"
 					>
-						{status} ({queue.counts[status]})
-					</Button>
+						{$t(`app.jobs.${tab.key}`)}
+						<span
+							class="rounded-full px-1.5 text-xs tabular-nums {selected
+								? 'bg-primary-foreground/20'
+								: tab.status === 'failed' && n > 0
+									? 'bg-destructive text-white'
+									: 'bg-muted'}">{n.toLocaleString()}</span
+						>
+					</a>
 				{/each}
-			</div>
+			</nav>
 		</Card.Header>
-		<Card.Content>
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head>{$t('app.jobs.id')}</Table.Head>
-						<Table.Head>{$t('app.jobs.name')}</Table.Head>
-						<Table.Head>{$t('app.jobs.state')}</Table.Head>
-						<Table.Head>{$t('app.jobs.created_at')}</Table.Head>
-						<Table.Head>{$t('app.jobs.processed_at')}</Table.Head>
-						<Table.Head>{$t('app.jobs.finished_at')}</Table.Head>
-						<Table.Head>{$t('app.jobs.ingestion_source')}</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each queue.jobs as job}
-						<Table.Row>
-							<Table.Cell>{job.id}</Table.Cell>
-							<Table.Cell>{job.name}</Table.Cell>
-							<Table.Cell class="capitalize">
-								{#if job.error}
-									<Button
-										variant="secondary"
-										size="sm"
-										class="cursor-pointer capitalize"
-										onclick={() => {
-											if (job.error) {
-												const el = document.getElementById(
-													`error-${job.id}`
-												);
-												if (el) {
-													el.classList.toggle('hidden');
-												}
-											}
-										}}
-									>
-										{job.state}
-									</Button>
-								{:else}
-									{job.state}
-								{/if}
-							</Table.Cell>
-							<Table.Cell>{new Date(job.timestamp).toLocaleString()}</Table.Cell>
-							<Table.Cell
-								>{job.processedOn
-									? new Date(job.processedOn).toLocaleString()
-									: 'N/A'}</Table.Cell
-							>
-							<Table.Cell
-								>{job.finishedOn
-									? new Date(job.finishedOn).toLocaleString()
-									: 'N/A'}</Table.Cell
-							>
-							<Table.Cell>
-								<a
-									href="/dashboard/archived-emails?ingestionSourceId={job.ingestionSourceId}"
-									>{job.ingestionSourceId || 'N/A'}</a
-								>
-							</Table.Cell>
-						</Table.Row>
-						{#if job.error}
-							<Table.Row id={`error-${job.id}`} class="hidden">
-								<Table.Cell colspan={7} class="p-0">
-									<pre
-										class="bg-muted max-w-full text-wrap rounded-md p-4 text-xs">{job.error}</pre>
-								</Table.Cell>
-							</Table.Row>
-						{/if}
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</Card.Content>
-		<Card.Footer class="flex flex-col items-center justify-between gap-4 sm:flex-row">
-			<div class="text-muted-foreground text-nowrap text-sm">
-				{$t('app.jobs.showing')}
-				{queue.jobs.length}
-				{$t('app.jobs.of')}
-				{queue.pagination.totalJobs}
-				{$t('app.jobs.jobs')}
-			</div>
-			{#if queue.pagination.totalJobs > queue.pagination.limit}
-				<Pagination.Root
-					count={queue.pagination.totalJobs}
-					perPage={queue.pagination.limit}
-					page={queue.pagination.currentPage}
-				>
-					{#snippet children({ pages, currentPage })}
-						<Pagination.Content>
-							<Pagination.Item>
-								<a
-									href={`/dashboard/admin/jobs/${queue.name}?status=${selectedStatus}&page=${
-										currentPage - 1
-									}`}
-								>
-									<Pagination.PrevButton>
-										<ChevronLeft class="h-4 w-4" />
-										<span class="hidden sm:block"
-											>{$t('app.jobs.previous')}</span
-										>
-									</Pagination.PrevButton>
-								</a>
-							</Pagination.Item>
-							{#each pages as page (page.key)}
-								{#if page.type === 'ellipsis'}
-									<Pagination.Item>
-										<Pagination.Ellipsis />
-									</Pagination.Item>
-								{:else}
-									<Pagination.Item>
-										<a
-											href={`/dashboard/admin/jobs/${queue.name}?status=${selectedStatus}&page=${page.value}`}
-										>
-											<Pagination.Link
-												{page}
-												isActive={currentPage === page.value}
-											>
-												{page.value}
-											</Pagination.Link>
-										</a>
-									</Pagination.Item>
-								{/if}
-							{/each}
-							<Pagination.Item>
-								<a
-									href={`/dashboard/admin/jobs/${queue.name}?status=${selectedStatus}&page=${
-										currentPage + 1
-									}`}
-								>
-									<Pagination.NextButton>
-										<span class="hidden sm:block">{$t('app.jobs.next')}</span>
-										<ChevronRight class="h-4 w-4" />
-									</Pagination.NextButton>
-								</a>
-							</Pagination.Item>
-						</Pagination.Content>
-					{/snippet}
-				</Pagination.Root>
+		<Card.Content class="space-y-3">
+			{#if queue.jobs.length === 0}
+				<p class="text-muted-foreground py-6 text-center text-sm">
+					{$t(`app.jobs.empty_${data.status}`)}
+				</p>
+			{:else}
+				<JobList jobs={queue.jobs} {now} onSelect={openJob} />
 			{/if}
-		</Card.Footer>
+
+			{#if queue.pagination.totalPages > 1}
+				<div class="flex items-center justify-between gap-2 text-sm">
+					<span class="text-muted-foreground">
+						{$t('app.jobs.page_of', {
+							page: data.page,
+							pages: queue.pagination.totalPages,
+						} as any)}
+						· {$t('app.jobs.jobs_total', {
+							count: queue.pagination.totalJobs.toLocaleString(),
+						} as any)}
+					</span>
+					<div class="flex gap-2">
+						<Button
+							size="sm"
+							variant="outline"
+							href={urlFor({ page: String(data.page - 1), job: null })}
+							disabled={data.page <= 1}
+							aria-label={$t('app.jobs.previous')}
+						>
+							<ChevronLeft class="h-4 w-4" />
+						</Button>
+						<Button
+							size="sm"
+							variant="outline"
+							href={urlFor({ page: String(data.page + 1), job: null })}
+							disabled={data.page >= queue.pagination.totalPages}
+							aria-label={$t('app.jobs.next')}
+						>
+							<ChevronRight class="h-4 w-4" />
+						</Button>
+					</div>
+				</div>
+			{/if}
+		</Card.Content>
 	</Card.Root>
 </div>
+
+<JobDetailDialog
+	bind:open={detailOpen}
+	queueName={queue.name}
+	jobId={detailId}
+	onChanged={() => invalidateAll()}
+/>

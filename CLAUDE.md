@@ -84,6 +84,8 @@ Known environment quirks:
 - **Comments:** upstream comments explain _why_, at length, often naming the bug or issue a line prevents. Match that density in the code you touch.
 - **Deletion** always goes through `ArchivedEmailService.deleteArchivedEmail` and is gated by `ENABLE_DELETION` (`checkDeletionEnabled`). That path checks legal hold, reference-counts shared storage files and removes Meilisearch documents.
 - **Destructive or maintenance jobs** use a fixed `jobId` with `claimJobId` / `isJobLive`, and `attempts: 1`.
+- **Job progress and logs:** both workers wrap their processor in `withJobLog`, so every job logs its start and its result or error to its BullMQ log, which the Jobs page shows. Long jobs should also report `job.updateProgress(...)` and log one line per phase, not per batch. Don't rely on a finished job's record to report its outcome later: the indexing worker keeps only the last 100 finished jobs across the whole queue, so a long import pushes a finished job out within seconds. Store the outcome yourself, as `MailboxMergeService.recordRun` does in Redis.
+- **Job controls** (Jobs page and `/v1/jobs/...`): only failed indexing jobs can be retried (an ingestion job belongs to a sync cycle; use Force Sync), and only finished jobs can be removed. A running job can't be stopped. Keep it that way unless the job type is known to be safe.
 
 ## Domain model essentials
 
@@ -97,6 +99,7 @@ Known environment quirks:
     Preserve-original (GoBD) sources also dedup on a content hash.
 
 - **Mailbox merge** (this fork):
+    - progress: `GET /v1/ingestion-sources/{id}/mailboxes/merge-status`, shown at the top of the source page by `MailboxMergeProgress.svelte`
     - `mailbox_aliases` (keyed on the group root, kept flat) maps a provider mailbox to a canonical one, and ingestion resolves it before the dedup gates
     - moved rows remember the provider mailbox in `archived_emails.original_user_email`, and unmerge moves them back
     - code: `MailboxMergeService`, `helpers/mailboxAlias.ts`, the `merge-mailboxes` and `unmerge-mailbox` jobs; docs: `docs/user-guides/email-providers/merging-mailboxes.md`

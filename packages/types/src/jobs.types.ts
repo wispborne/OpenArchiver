@@ -208,7 +208,33 @@ export interface IJob {
 	returnValue: any;
 	ingestionSourceId?: string;
 	error?: any;
+	/** The ingestion source's name, when the job names a source that still exists. */
+	ingestionSourceName?: string;
+	/** What the job last reported with `updateProgress`: a percentage, or a job-specific object. */
+	progress?: number | object;
+	/** How many attempts the job is allowed in total. */
+	attemptsAllowed?: number;
+	/**
+	 * Whether `POST .../jobs/{jobId}/retry` accepts this job. Only failed jobs of the indexing
+	 * queue: ingestion jobs belong to a sync cycle, and re-running one on its own leaves that cycle's
+	 * bookkeeping out of step, so a failed sync is repeated with Force Sync on the source instead.
+	 */
+	canRetry?: boolean;
+	/** Whether `DELETE .../jobs/{jobId}` accepts this job: finished (completed or failed) jobs only. */
+	canRemove?: boolean;
 }
+
+/** A job with everything kept about it, for the job detail view. */
+export interface IJobDetail extends IJob {
+	queueName: string;
+	/** Lines the job wrote with `job.log()`, oldest first. */
+	logs: string[];
+	/** Total log lines; `logs` holds at most the most recent 500. */
+	logCount: number;
+}
+
+/** Why a job or queue action was refused. */
+export type JobActionRefusal = 'not_found' | 'wrong_state' | 'not_retryable';
 
 /**
  * Holds the count of jobs in various states for a single queue.
@@ -220,6 +246,8 @@ export interface IQueueCounts {
 	delayed: number;
 	waiting: number;
 	paused: number;
+	/** Waiting jobs that carry a priority. BullMQ keeps them apart from `waiting`. */
+	prioritized?: number;
 }
 
 /**
@@ -228,6 +256,10 @@ export interface IQueueCounts {
 export interface IQueueOverview {
 	name: string;
 	counts: IQueueCounts;
+	/** Whether the queue is paused: workers finish what they hold and take nothing new. */
+	isPaused?: boolean;
+	/** Whether a worker for this queue has reported a heartbeat recently. */
+	workerAlive?: boolean;
 }
 
 /**
@@ -246,6 +278,8 @@ export interface IPagination {
 export interface IQueueDetails {
 	name: string;
 	counts: IQueueCounts;
+	isPaused?: boolean;
+	workerAlive?: boolean;
 	jobs: IJob[];
 	pagination: IPagination;
 }

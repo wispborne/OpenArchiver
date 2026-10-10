@@ -110,5 +110,17 @@
 	},
 	"sso": {
 		"requiresSuperAdminRole": "Super Admin role is required to manage single sign-on."
+	},
+	"jobs": {
+		"retried": "The job was queued to run again.",
+		"retriedAll": "Every failed job was queued to run again.",
+		"removed": "The job was removed.",
+		"cleaned": "Finished jobs were removed.",
+		"paused": "The queue is paused. Running jobs finish; no new ones start until it is resumed.",
+		"resumed": "The queue is running again.",
+		"invalidCleanState": "Choose whether to remove completed or failed jobs.",
+		"not_found": "That job or queue no longer exists.",
+		"wrong_state": "The job is not in a state that allows this.",
+		"not_retryable": "Ingestion jobs can't be retried one at a time. Use Force Sync on the ingestion source instead."
 	}
 }

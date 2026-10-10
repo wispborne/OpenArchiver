@@ -585,6 +585,12 @@ const options = {
 						delayed: { type: 'integer', example: 0 },
 						waiting: { type: 'integer', example: 0 },
 						paused: { type: 'integer', example: 0 },
+						prioritized: {
+							type: 'integer',
+							example: 0,
+							description:
+								'Waiting jobs that carry a priority, kept apart from `waiting`.',
+						},
 					},
 					required: ['active', 'completed', 'failed', 'delayed', 'waiting', 'paused'],
 				},
@@ -593,6 +599,16 @@ const options = {
 					properties: {
 						name: { type: 'string', example: 'ingestion' },
 						counts: { $ref: '#/components/schemas/QueueCounts' },
+						isPaused: {
+							type: 'boolean',
+							description:
+								'Whether the queue is paused: workers finish what they hold and start nothing new.',
+						},
+						workerAlive: {
+							type: 'boolean',
+							description:
+								'Whether a worker for this queue has reported a heartbeat recently.',
+						},
 					},
 					required: ['name', 'counts'],
 				},
@@ -629,6 +645,27 @@ const options = {
 						error: {
 							description: 'Shorthand copy of `failedReason` for easier access.',
 							nullable: true,
+						},
+						ingestionSourceName: {
+							type: 'string',
+							description:
+								'Name of the ingestion source the job names, if it still exists.',
+						},
+						progress: {
+							description:
+								'What the job last reported: a percentage, or a job-specific object.',
+							nullable: true,
+						},
+						attemptsAllowed: { type: 'integer', example: 1 },
+						canRetry: {
+							type: 'boolean',
+							description:
+								'Whether the retry endpoint accepts this job: failed jobs of the indexing queue only.',
+						},
+						canRemove: {
+							type: 'boolean',
+							description:
+								'Whether the remove endpoint accepts this job: completed or failed jobs only.',
 						},
 					},
 					required: [

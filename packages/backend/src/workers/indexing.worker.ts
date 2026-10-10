@@ -10,6 +10,7 @@ import unmergeMailboxProcessor from '../jobs/processors/unmerge-mailbox.processo
 import { logger } from '../config/logger';
 import { config } from '../config';
 import { superviseWorker } from './supervision';
+import { withJobLog } from '../jobs/helpers/withJobLog';
 
 const processor = async (job: any) => {
 	switch (job.name) {
@@ -32,7 +33,7 @@ const processor = async (job: any) => {
 	}
 };
 
-const worker = new Worker('indexing', processor, {
+const worker = new Worker('indexing', withJobLog(processor), {
 	connection,
 	// Left unset, this defaulted to 1, and a job spends most of its life waiting rather than
 	// computing — a storage read per email, then a Meilisearch task it must see finish before it may

@@ -9,6 +9,7 @@ import backfillProviderIdsProcessor from '../jobs/processors/backfill-provider-i
 import { logger } from '../config/logger';
 import { config } from '../config';
 import { superviseWorker } from './supervision';
+import { withJobLog } from '../jobs/helpers/withJobLog';
 
 const processor = async (job: any) => {
 	switch (job.name) {
@@ -29,7 +30,7 @@ const processor = async (job: any) => {
 	}
 };
 
-const worker = new Worker('ingestion', processor, {
+const worker = new Worker('ingestion', withJobLog(processor), {
 	connection,
 	// Configurable via INGESTION_WORKER_CONCURRENCY env var. Tune based on available RAM.
 	concurrency: config.ingestion.workerConcurrency,

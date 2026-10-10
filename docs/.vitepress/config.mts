@@ -39,6 +39,7 @@ export default defineConfig({
 					{ text: 'Searching the Archive', link: '/user-guides/searching' },
 					{ text: 'Search Indexing & Reindexing', link: '/user-guides/search-indexing' },
 					{ text: 'Removing Duplicate Emails', link: '/user-guides/removing-duplicates' },
+					{ text: 'Background Jobs', link: '/user-guides/background-jobs' },
 					{
 						text: 'Email Providers',
 						link: '/user-guides/email-providers/',
