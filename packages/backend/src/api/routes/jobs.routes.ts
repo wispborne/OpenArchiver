@@ -423,5 +423,63 @@ export const createJobsRouter = (authService: AuthService): Router => {
 		jobsController.resume
 	);
 
+	/**
+	 * @openapi
+	 * /v1/jobs/maintenance/attachment-repair:
+	 *   get:
+	 *     summary: Get attachment repair status
+	 *     description: Reports the attachment repair in progress, or the last one to finish, with its counts. Answers `null` when none is on record. Requires `manage:all` (Super Admin) permission.
+	 *     operationId: getAttachmentRepairStatus
+	 *     tags:
+	 *       - Jobs
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     responses:
+	 *       '200':
+	 *         description: The latest repair, or `null`. `state` is one of queued, running, completed, failed or interrupted; `progress` is set while it runs and `result` once it has completed.
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '403':
+	 *         $ref: '#/components/responses/Forbidden'
+	 *   post:
+	 *     summary: Repair attachment files
+	 *     description: Queues a job that walks every attachment record, rebuilds files missing from storage out of an email whose stored file still holds the attachment (only when its SHA-256 matches the recorded checksum; ingestion normally strips attachments from stored emails, so usually none does), counts the emails left with an attachment it could not rebuild, gives records from older versions that have no ingestion source the source of an email that uses them, and reindexes the emails whose attachments were restored. Nothing is deleted. Safe to run again. Requires `manage:all` (Super Admin) permission.
+	 *     operationId: startAttachmentRepair
+	 *     tags:
+	 *       - Jobs
+	 *     security:
+	 *       - bearerAuth: []
+	 *       - apiKeyAuth: []
+	 *     responses:
+	 *       '202':
+	 *         description: Queued, or joined a repair already running (`alreadyRunning`).
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 message:
+	 *                   type: string
+	 *                 alreadyRunning:
+	 *                   type: boolean
+	 *                 workerAlive:
+	 *                   type: boolean
+	 *       '401':
+	 *         $ref: '#/components/responses/Unauthorized'
+	 *       '403':
+	 *         $ref: '#/components/responses/Forbidden'
+	 */
+	router.get(
+		'/maintenance/attachment-repair',
+		requirePermission('manage', 'all', 'user.requiresSuperAdminRole'),
+		jobsController.getAttachmentRepairStatus
+	);
+	router.post(
+		'/maintenance/attachment-repair',
+		requirePermission('manage', 'all', 'user.requiresSuperAdminRole'),
+		jobsController.startAttachmentRepair
+	);
+
 	return router;
 };

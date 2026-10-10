@@ -7,6 +7,7 @@ import cleanupOrphansProcessor from '../jobs/processors/cleanup-orphans.processo
 import cleanupDuplicatesProcessor from '../jobs/processors/cleanup-duplicates.processor';
 import mergeMailboxesProcessor from '../jobs/processors/merge-mailboxes.processor';
 import unmergeMailboxProcessor from '../jobs/processors/unmerge-mailbox.processor';
+import repairAttachmentsProcessor from '../jobs/processors/repair-attachments.processor';
 import { logger } from '../config/logger';
 import { config } from '../config';
 import { superviseWorker } from './supervision';
@@ -28,6 +29,8 @@ const processor = async (job: any) => {
 			return mergeMailboxesProcessor(job);
 		case 'unmerge-mailbox':
 			return unmergeMailboxProcessor(job);
+		case 'repair-attachments':
+			return repairAttachmentsProcessor(job);
 		default:
 			throw new Error(`Unknown job name: ${job.name}`);
 	}

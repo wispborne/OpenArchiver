@@ -1455,7 +1455,8 @@ export class IngestionService {
 	 * suffix of the original name, preserving the extension. The original filename is still
 	 * stored unmodified in the attachments.filename column.
 	 */
-	private buildAttachmentFileName(filename: string): string {
+	// Public so the attachment repair job names the files it restores exactly as ingestion would.
+	public static buildAttachmentFileName(filename: string): string {
 		const sanitized = filename.replace(/[/\\\u0000-\u001f]/g, '_');
 		// 180-byte cap + the 8-byte `uniqueId-` prefix stays well under the 255-byte limit.
 		if (Buffer.byteLength(sanitized) <= 180) {
@@ -1585,7 +1586,7 @@ export class IngestionService {
 			// New attachment: store under the root source's folder. Path uses the source ID only —
 			// not the name — so that renaming a source never causes a path mismatch.
 			const uniqueId = randomUUID().slice(0, 7);
-			const storagePath = `${config.storage.openArchiverFolderName}/${effectiveSourceId}/attachments/${uniqueId}-${this.buildAttachmentFileName(attachment.filename)}`;
+			const storagePath = `${config.storage.openArchiverFolderName}/${effectiveSourceId}/attachments/${uniqueId}-${IngestionService.buildAttachmentFileName(attachment.filename)}`;
 			await storage.put(storagePath, attachment.content);
 
 			const [newRecord] = await db

@@ -122,6 +122,8 @@
 		"invalidCleanState": "Choose whether to remove completed or failed jobs.",
 		"not_found": "That job or queue no longer exists.",
 		"wrong_state": "The job is not in a state that allows this.",
+		"attachmentRepairStarted": "Attachment repair started. It runs in the background.",
+		"attachmentRepairAlreadyRunning": "An attachment repair is already running.",
 		"not_retryable": "Ingestion jobs can't be retried one at a time. Use Force Sync on the ingestion source instead."
 	}
 }

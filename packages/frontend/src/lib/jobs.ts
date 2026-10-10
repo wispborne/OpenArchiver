@@ -52,9 +52,11 @@ export const jobPercent = (progress: IJob['progress']): number | null => {
 		return progress > 0 ? Math.min(100, Math.round(progress)) : null;
 	}
 	if (progress && typeof progress === 'object') {
-		const p = progress as Partial<MailboxMergeProgress>;
-		if (typeof p.moved === 'number' && typeof p.total === 'number' && p.total > 0) {
-			return Math.min(100, Math.round((p.moved / p.total) * 100));
+		// A merge counts `moved`, the attachment repair counts `done`; both of a `total`.
+		const p = progress as Partial<MailboxMergeProgress> & { done?: number };
+		const done = typeof p.moved === 'number' ? p.moved : p.done;
+		if (typeof done === 'number' && typeof p.total === 'number' && p.total > 0) {
+			return Math.min(100, Math.round((done / p.total) * 100));
 		}
 	}
 	return null;

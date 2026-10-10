@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { JobActionError, JobsService } from '../../services/JobsService';
+import { AttachmentRepairService } from '../../services/AttachmentRepairService';
 import { logger } from '../../config/logger';
 import {
 	IGetQueueJobsRequestParams,
@@ -113,6 +114,34 @@ export class JobsController {
 			return res.status(200).json({ message: req.t('jobs.resumed') });
 		} catch (error) {
 			return this.actionError(req, res, error, 'Resume queue error');
+		}
+	};
+
+	public getAttachmentRepairStatus = async (req: Request, res: Response) => {
+		try {
+			return res.status(200).json(await AttachmentRepairService.getStatus());
+		} catch (error) {
+			return this.actionError(req, res, error, 'Get attachment repair status error');
+		}
+	};
+
+	public startAttachmentRepair = async (req: Request, res: Response) => {
+		const userId = req.user?.sub;
+		if (!userId) {
+			return res.status(401).json({ message: req.t('errors.unauthorized') });
+		}
+		try {
+			const dispatch = await AttachmentRepairService.trigger(userId);
+			return res.status(202).json({
+				message: req.t(
+					dispatch.alreadyRunning
+						? 'jobs.attachmentRepairAlreadyRunning'
+						: 'jobs.attachmentRepairStarted'
+				),
+				...dispatch,
+			});
+		} catch (error) {
+			return this.actionError(req, res, error, 'Start attachment repair error');
 		}
 	};
 

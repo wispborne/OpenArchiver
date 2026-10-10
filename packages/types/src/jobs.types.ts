@@ -313,3 +313,56 @@ export interface IGetQueueJobsRequestQuery {
  * Response body for the endpoint that retrieves jobs from a specific queue.
  */
 export type IGetQueueJobsResponse = IQueueDetails;
+
+/**
+ * Where a running attachment repair has got to. `done` of `total` attachment records checked.
+ * - `checking`: walking every attachment record, restoring missing files as it goes
+ * - `reindexing`: queuing the emails whose attachments were restored for indexing
+ */
+export interface AttachmentRepairProgress {
+	phase: 'checking' | 'reindexing';
+	done: number;
+	total: number;
+	repaired: number;
+	missing: number;
+}
+
+/** What an attachment repair did. */
+export interface IAttachmentRepairResult {
+	/** Attachment records looked at. */
+	checked: number;
+	/** Records whose stored file was missing. The four outcomes below add up to this. */
+	missing: number;
+	/** Missing files rebuilt from an email that carries the attachment. */
+	repaired: number;
+	/** Missing, and no email links to the record, so there is nothing to rebuild it from. */
+	unreferenced: number;
+	/**
+	 * Missing, and none of the linked emails' stored files holds an attachment with the recorded
+	 * checksum. The usual case: ingestion strips attachments from the stored .eml.
+	 */
+	notFoundInEmail: number;
+	/** Missing, and the repair attempt threw. Details are in the job's log. */
+	failed: number;
+	/** Records from older versions that had no ingestion source, now given their email's source. */
+	ownerBackfilled: number;
+	/** Emails queued for reindexing because an attachment of theirs was restored. */
+	emailsReindexed: number;
+	/**
+	 * Emails that still have an attachment whose file is missing and could not be rebuilt. Their
+	 * stored .eml no longer holds the attachment (ingestion normally strips it out), so it has to
+	 * come from a backup or the original mailbox.
+	 */
+	emailsAffected: number;
+}
+
+/** The latest attachment repair: the one running, or else the last to finish. */
+export interface AttachmentRepairStatus {
+	state: 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
+	progress: AttachmentRepairProgress | null;
+	result: IAttachmentRepairResult | null;
+	error: string | null;
+	startedAt: string | null;
+	finishedAt: string | null;
+	workerAlive: boolean;
+}

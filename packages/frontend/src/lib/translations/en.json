@@ -1122,7 +1122,8 @@
 				"cleanup-orphans": "Remove orphaned search entries",
 				"cleanup-duplicates": "Remove duplicate emails",
 				"merge-mailboxes": "Merge mailboxes",
-				"unmerge-mailbox": "Unmerge mailbox"
+				"unmerge-mailbox": "Unmerge mailbox",
+				"repair-attachments": "Repair attachment files"
 			},
 			"describe_emails": "Emails: {{count}}",
 			"describe_reindex_missing": "Missing only",
@@ -1131,7 +1132,21 @@
 			"phase_moving": "Moving emails",
 			"phase_settling": "Waiting for running syncs to pick up the change",
 			"phase_final_pass": "Moving emails that arrived meanwhile",
-			"phase_removing_duplicates": "Removing duplicate copies"
+			"phase_removing_duplicates": "Removing duplicate copies",
+			"phase_checking": "Checking attachment files",
+			"phase_reindexing": "Queuing emails for reindexing",
+			"maintenance": "Maintenance",
+			"repair_title": "Repair attachment files",
+			"repair_description": "Checks every attachment record for its stored file, and gives records from older versions with no ingestion source the source of an email that uses them. A missing file is rebuilt where an email's stored .eml still holds the attachment with the same checksum; usually it doesn't, because attachments are kept only as separate files. Anything it can't rebuild is counted, with the emails it affects, and listed in the job's log. Nothing is deleted, and it is safe to run again.",
+			"repair_start": "Check and repair",
+			"repair_queued": "Queued. It starts when the indexing worker picks it up.",
+			"repair_progress": "Checked {{done}} of {{total}} attachment records. Missing files so far: {{missing}}. Restored: {{repaired}}.",
+			"repair_done": "Checked {{checked}} attachment records. Missing files: {{missing}}. Restored: {{repaired}}.",
+			"repair_left": "Left as they were: not used by any email {{unreferenced}}, not held in their emails' stored files {{notFound}}, errors {{failed}}. The job's log lists them.",
+			"repair_affected": "Emails with an attachment that could not be rebuilt: {{count}}. Those attachments have to come from a backup of the storage folder, or from the original mailbox.",
+			"repair_extra": "Records given a source: {{owners}}. Emails queued for reindexing: {{emails}}.",
+			"repair_interrupted": "The last repair stopped before finishing. Run it again to finish; it only looks at what is still missing.",
+			"repair_failed": "The last repair failed: {{error}}"
 		},
 		"index_admin": {
 			"title": "Search Index",

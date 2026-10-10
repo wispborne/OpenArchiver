@@ -46,3 +46,13 @@ A link to a job stays valid while the job is kept, so you can send it to someone
 - **Remove** a finished job, or **clear** all completed or all failed jobs of a queue. This deletes their records, logs and results only; it doesn't undo anything the jobs did.
 
 Some things are deliberately not offered. A running job can't be stopped, because the job system has no way to interrupt one partway, and stopping, say, a merge in the middle would leave its work half done. Waiting jobs can't be removed either, because their work would then never happen: a removed sync would leave its sync cycle open for good.
+
+## Maintenance: repair attachment files
+
+**Check and repair**, under Maintenance on the Jobs page, walks every attachment record and checks that its stored file exists.
+
+- **Missing files.** Attachments are normally kept only as separate files, and removed from the stored email, so a missing file usually can't be rebuilt from the archive. Where an email's stored file does still hold the attachment (preserve-original sources, and mail archived by older versions), the job rebuilds the file from it, checks it against the recorded checksum, and reindexes the email.
+- **What's left over.** Everything it can't rebuild is counted, together with the number of emails affected, and listed in the job's log. Those attachments have to come back from a backup of the storage folder, or from the original mailbox.
+- **Records with no source.** Records written by older versions with no ingestion source are given the source of an email that uses them. That makes them count in the source's statistics, and lets new mail reuse them instead of storing another copy.
+
+Nothing is deleted, and the job is safe to run again. A common cause of missing files is deleting an ingestion source on an older version: shared attachments were stored in the folder of the source that first saw them, and that folder went with the source.

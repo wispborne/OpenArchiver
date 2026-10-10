@@ -1,7 +1,12 @@
 import { api } from '$lib/server/api';
 import { error, type NumericRange } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { IGetQueuesResponse, IJob, IQueueDetails } from '@open-archiver/types';
+import type {
+	AttachmentRepairStatus,
+	IGetQueuesResponse,
+	IJob,
+	IQueueDetails,
+} from '@open-archiver/types';
 
 /** Running jobs shown per queue on the overview; the queue page lists the rest. */
 const ACTIVE_LIMIT = 20;
@@ -44,9 +49,19 @@ export const load: PageServerLoad = async (event) => {
 		(b.finishedOn ?? b.processedOn ?? b.timestamp) -
 		(a.finishedOn ?? a.processedOn ?? a.timestamp);
 
+	// Optional: the page works without it, it just can't show the maintenance card's status.
+	let attachmentRepair: AttachmentRepairStatus | null = null;
+	try {
+		const res = await api('/jobs/maintenance/attachment-repair', event);
+		if (res.ok) attachmentRepair = await res.json();
+	} catch {
+		// Left null.
+	}
+
 	return {
 		queues,
 		active: active.flat().sort(byRecent),
 		failed: failed.flat().sort(byRecent).slice(0, 8),
+		attachmentRepair,
 	};
 };

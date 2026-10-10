@@ -16,6 +16,7 @@ Kept current as the fork changes. Newest first within each group.
 
 **New features**
 
+- **Repair attachment files** (Admin → Jobs → Maintenance). Finds attachment records whose stored file is missing, rebuilds what it can from the stored emails, reports the emails it can't fix, and gives old records with no source their email's source. See [Background Jobs](docs/user-guides/background-jobs.md#maintenance-repair-attachment-files).
 - **Background jobs on the dashboard.** Super Admins see each queue's worker status and counts, and the jobs running now with their progress.
 - **Jobs page redesign** (Admin → Jobs).
     - Each queue shows whether its worker is running and whether it is paused, with job counts by state.
@@ -47,6 +48,7 @@ Kept current as the fork changes. Newest first within each group.
 - `GET /v1/ingestion-sources/{id}/mailboxes/merge-status`, plus the mailbox merge endpoints (`merge-preview`, `merge`, `unmerge`, `mailbox-aliases`).
 - `GET .../duplicates` (count) and `POST .../duplicates/cleanup`, per source (`/v1/ingestion-sources/{id}/…`) and for the whole archive (`/v1/ingestion-sources/…`).
 - Jobs: `GET /v1/jobs/queues/{queue}/jobs/{id}` (with the job's log), job retry and remove, retry all failed jobs, clean, pause and resume.
+- `GET` and `POST /v1/jobs/maintenance/attachment-repair` (status, and start).
 - Optional fields: `isPaused`, `workerAlive` and `prioritized` on queues; `progress`, `ingestionSourceName`, `canRetry`, `canRemove` and `attemptsAllowed` on jobs; `alreadyRunning` on Force Sync.
 
 **For developers**

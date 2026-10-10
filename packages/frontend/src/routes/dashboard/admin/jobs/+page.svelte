@@ -11,6 +11,7 @@
 	import JobList from '$lib/components/custom/jobs/JobList.svelte';
 	import JobDetailDialog from '$lib/components/custom/jobs/JobDetailDialog.svelte';
 	import QueueControls from '$lib/components/custom/jobs/QueueControls.svelte';
+	import AttachmentRepairCard from '$lib/components/custom/jobs/AttachmentRepairCard.svelte';
 	import { Database, Inbox } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -177,6 +178,10 @@
 			{/if}
 		</Card.Content>
 	</Card.Root>
+	<section class="space-y-3">
+		<h2 class="text-lg font-semibold">{$t('app.jobs.maintenance')}</h2>
+		<AttachmentRepairCard status={data.attachmentRepair} onChanged={() => invalidateAll()} />
+	</section>
 </div>
 
 <JobDetailDialog
