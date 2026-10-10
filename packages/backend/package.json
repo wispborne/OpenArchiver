@@ -12,7 +12,7 @@
 	"scripts": {
 		"build": "tsc && pnpm copy-assets",
 		"dev": "tsc --watch",
-		"copy-assets": "cp -r src/locales dist/locales",
+		"copy-assets": "mkdir -p dist/locales && cp -r src/locales/. dist/locales/",
 		"start:ingestion-worker": "node dist/workers/ingestion.worker.js",
 		"start:indexing-worker": "node dist/workers/indexing.worker.js",
 		"start:sync-scheduler": "node dist/jobs/schedulers/sync-scheduler.js",
