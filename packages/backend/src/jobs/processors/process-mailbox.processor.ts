@@ -195,6 +195,26 @@ export const processMailboxProcessor = async (job: Job<IProcessMailboxJob>) => {
 		// reaction per remaining message of the mailbox, in a worker with no heap ceiling.
 		let slotFree: (() => void) | null = null;
 
+		// Mid-job progress, so a sync that dies after hours resumes where it was instead of
+		// starting every folder over and re-checking each archived message. The connector calls
+		// this between batches with the generator paused, so nothing new is yielded meanwhile.
+		//
+		// Two conditions keep a checkpoint from claiming mail that never made it:
+		//  - the emails already yielded are still being archived concurrently (see `keyed`), so
+		//    they are all awaited first; inFlight tasks never reject.
+		//  - once any message has failed, no further checkpoint is written. The final sync state
+		//    is discarded on failure for the same reason (so the next cycle retries the failed
+		//    message), and a checkpoint past it would defeat that. The last checkpoint before the
+		//    failure still stands, which is the point.
+		connector.setCheckpointHandler?.(async (state) => {
+			await Promise.all(inFlight);
+			const fetchFailures = connector?.getFetchFailures?.();
+			if (messagesFailed > 0 || (fetchFailures && fetchFailures.count > 0)) {
+				return;
+			}
+			await SyncSessionService.checkpointSyncState(ingestionSourceId, state);
+		});
+
 		for await (const email of connector.fetchEmails(
 			userEmail,
 			source.syncState,

@@ -91,6 +91,14 @@ export class ImapConnector implements IEmailConnector {
 	/** Built lazily: with OAuth in play, constructing a client means fetching a token. */
 	private client: ImapFlow | null = null;
 	private newMaxUids: { [mailboxPath: string]: number } = {};
+	/**
+	 * The highest UID per folder whose whole batch was yielded without an error. newMaxUids runs
+	 * ahead of this during a batch (pass 1 advances it before pass 2 downloads anything), so a
+	 * folder that fails mid-batch is wound back to here rather than reporting UIDs that were never
+	 * archived as done.
+	 */
+	private completedMaxUids: { [mailboxPath: string]: number } = {};
+	private checkpointHandler?: (state: SyncState) => Promise<void>;
 	private statusMessage: string | undefined;
 	private options: ConnectorOptions;
 
@@ -222,6 +230,10 @@ export class ImapConnector implements IEmailConnector {
 	 * The mailbox identity for an IMAP source is the username an administrator typed into the
 	 * connection form, so it is the value most likely to carry stray padding or unexpected casing.
 	 */
+	public setCheckpointHandler(handler: (state: SyncState) => Promise<void>): void {
+		this.checkpointHandler = handler;
+	}
+
 	public returnImapUserEmail(): string {
 		return normalizeEmailAddress(this.credentials.username);
 	}
@@ -329,6 +341,7 @@ export class ImapConnector implements IEmailConnector {
 
 					// Initialize with last synced UID, not the maximum UID in mailbox
 					this.newMaxUids[mailboxPath] = lastUid || 0;
+					this.completedMaxUids[mailboxPath] = lastUid || 0;
 
 					// Only fetch if the mailbox has messages, to avoid errors on empty mailboxes with some IMAP servers.
 					if (mailbox.exists > 0) {
@@ -427,12 +440,48 @@ export class ImapConnector implements IEmailConnector {
 								}
 							}
 
+							// The whole UID range of this batch has now been listed and every message in
+							// it yielded, so it is done even where it had gaps: the server assigns UIDs
+							// in ascending order, and anything arriving later lands above maxUidToFetch.
+							this.newMaxUids[mailboxPath] = Math.max(
+								this.newMaxUids[mailboxPath],
+								endUid
+							);
+							this.completedMaxUids[mailboxPath] = this.newMaxUids[mailboxPath];
+
+							// Awaited, so the handler can wait for the yielded messages to finish
+							// archiving before it records them as done. A failed checkpoint is only a
+							// lost shortcut, never lost mail, so it is logged and the sync continues.
+							if (this.checkpointHandler) {
+								try {
+									await this.checkpointHandler({
+										imap: {
+											[mailboxPath]: {
+												maxUid: this.completedMaxUids[mailboxPath],
+											},
+										},
+									});
+								} catch (err) {
+									logger.warn(
+										{ err, mailboxPath, uid: endUid },
+										'Failed to save IMAP sync checkpoint; continuing'
+									);
+								}
+							}
+
 							// Move to the next batch
 							startUid = endUid + 1;
 						}
 					}
 				} catch (err: any) {
 					logger.error({ err, mailboxPath }, 'Failed to process mailbox');
+					// Pass 1 had already advanced newMaxUids past messages pass 2 never got to,
+					// and the folder's failure is swallowed here, so the job would otherwise end
+					// "successfully" and save a marker beyond mail that was never archived.
+					// Winding back to the last finished batch makes the next sync retry them.
+					if (mailboxPath in this.completedMaxUids) {
+						this.newMaxUids[mailboxPath] = this.completedMaxUids[mailboxPath];
+					}
 					// Check if the error indicates a persistent failure after retries
 					if (err.message.includes('IMAP operation failed after all retries')) {
 						this.statusMessage =
