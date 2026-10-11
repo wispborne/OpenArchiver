@@ -87,6 +87,7 @@ Kept current as the fork changes. Newest first within each group.
 - A rebuilt backend picks up new translations. Before, the build copied them into a nested folder, so new messages showed as raw keys. Docker images, which build from scratch, were not affected.
 - Storage sizes show `0 Bytes`, not `NaN undefined`, for a source with no mail.
 - An email with a long run of spaces in a plain-text part no longer freezes the ingestion or indexing worker. `mailparser` is updated from 3.7.4 to 3.9.38, which fixes a regex that took hours on such text; the worker stopped logging and showed as not running while the sync job stayed "Running".
+- The MCP server no longer leaks about 1 MB per request. zod 4.1.5 kept every described schema in a global registry forever, and the server builds its tool schemas per request, so memory grew until the container was restarted. zod is updated to 4.6.6, whose registry lets them be freed.
 - IMAP sync saves its progress after every batch of 250 messages, per folder. Before, progress was saved only when the whole mailbox finished, so a sync that crashed or was restarted started every folder over from the first message.
 
 **API additions** (all additive)
