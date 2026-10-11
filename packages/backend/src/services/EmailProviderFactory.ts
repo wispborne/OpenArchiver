@@ -56,6 +56,14 @@ export interface IEmailConnector {
 	 * the skipped messages are reported instead of disappearing without a trace.
 	 */
 	getFetchFailures?(): { count: number; samples: string[] };
+	/**
+	 * Registers a callback the connector awaits at safe points mid-sync — for IMAP, after each
+	 * fully-yielded UID batch — with the sync state reached so far. Without it, progress is only
+	 * written when the whole mailbox job finishes, so a sync that dies after a day loses that day:
+	 * the next run starts the folder from UID 1 and re-checks every archived message. The handler
+	 * decides whether the checkpoint is safe to persist (it must not be once a message has failed).
+	 */
+	setCheckpointHandler?(handler: (state: SyncState) => Promise<void>): void;
 }
 
 export class EmailProviderFactory {

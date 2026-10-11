@@ -86,6 +86,8 @@ Kept current as the fork changes. Newest first within each group.
 - A stuck Meilisearch queue no longer grows without bound. Workers hold documents back once `MEILI_MAX_PENDING_TASKS` (default 1000) tasks are waiting. They also check on Meilisearch tasks every 500 ms instead of every 50 ms (`MEILI_WAIT_FOR_TASK_INTERVAL`). See [Search Index Stuck](docs/user-guides/troubleshooting/search-index-stuck.md).
 - A rebuilt backend picks up new translations. Before, the build copied them into a nested folder, so new messages showed as raw keys. Docker images, which build from scratch, were not affected.
 - Storage sizes show `0 Bytes`, not `NaN undefined`, for a source with no mail.
+- An email with a long run of spaces in a plain-text part no longer freezes the ingestion or indexing worker. `mailparser` is updated from 3.7.4 to 3.9.38, which fixes a regex that took hours on such text; the worker stopped logging and showed as not running while the sync job stayed "Running".
+- IMAP sync saves its progress after every batch of 250 messages, per folder. Before, progress was saved only when the whole mailbox finished, so a sync that crashed or was restarted started every folder over from the first message.
 
 **API additions** (all additive)
 

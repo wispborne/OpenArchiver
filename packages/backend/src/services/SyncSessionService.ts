@@ -222,6 +222,26 @@ export class SyncSessionService {
 	}
 
 	/**
+	 * Merges a mid-job sync-state checkpoint into the source, without touching session counters.
+	 *
+	 * Same merge as a finished mailbox uses, so a checkpoint for one IMAP folder replaces only
+	 * that folder's marker and concurrent mailbox jobs cannot overwrite each other. A later
+	 * checkpoint, or the job's own final state, simply supersedes it.
+	 */
+	public static async checkpointSyncState(
+		ingestionSourceId: string,
+		state: SyncState
+	): Promise<void> {
+		if (Object.keys(state).length === 0) {
+			return;
+		}
+		await db
+			.update(ingestionSources)
+			.set({ syncState: buildSyncStateMerge(state) })
+			.where(eq(ingestionSources.id, ingestionSourceId));
+	}
+
+	/**
 	 * Deletes a sync session after finalization to keep the table clean.
 	 */
 	public static async finalize(sessionId: string): Promise<void> {
